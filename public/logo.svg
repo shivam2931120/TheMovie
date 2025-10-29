@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="32" viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>TheMovie Logo</title>
+  <rect x="0" y="0" width="128" height="32" rx="8" fill="#111827"/>
+  <g transform="translate(8,4)">
+    <rect x="0" y="0" width="24" height="24" rx="6" fill="#1F2937" stroke="#374151"/>
+    <path d="M7 8h10l-2 10H9L7 8z" fill="#F59E0B"/>
+    <circle cx="12" cy="12" r="3" fill="#111827"/>
+    <circle cx="12" cy="12" r="2" fill="#F59E0B"/>
+  </g>
+  <g transform="translate(40,6)">
+    <rect x="0" y="0" width="80" height="20" rx="10" fill="#10B981"/>
+    <text x="40" y="14" text-anchor="middle" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" fill="#ffffff">TheMovie</text>
+  </g>
+</svg>

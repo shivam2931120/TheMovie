@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Movie Catalogue Data</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0a0a0a;
+            color: #e5e5e5;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #b91c1c;
+        }
+        .success {
+            background: #16a34a;
+        }
+        .success:hover {
+            background: #15803d;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        h1 { color: #3b82f6; }
+        .info { color: #fbbf24; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🧹 Movie Catalogue Data Manager</h1>
+    
+    <div class="info">
+        <strong>Current Data:</strong>
+        <pre id="currentData">Loading...</pre>
+    </div>
+
+    <button onclick="clearWatchlist()">Clear Watchlist</button>
+    <button onclick="clearWatched()">Clear Watched</button>
+    <button onclick="clearAll()">Clear All Data</button>
+    <button class="success" onclick="location.reload()">Refresh</button>
+
+    <script>
+        function displayCurrentData() {
+            const watchlist = localStorage.getItem('movie_catalogue_watchlist_v1');
+            const watched = localStorage.getItem('movie_catalogue_watched_v1');
+            
+            const data = {
+                watchlist: watchlist ? JSON.parse(watchlist) : [],
+                watched: watched ? JSON.parse(watched) : []
+            };
+            
+            document.getElementById('currentData').textContent = JSON.stringify(data, null, 2);
+        }
+
+        function clearWatchlist() {
+            if (confirm('Clear all watchlist data?')) {
+                localStorage.removeItem('movie_catalogue_watchlist_v1');
+                alert('Watchlist cleared!');
+                displayCurrentData();
+            }
+        }
+
+        function clearWatched() {
+            if (confirm('Clear all watched data?')) {
+                localStorage.removeItem('movie_catalogue_watched_v1');
+                alert('Watched data cleared!');
+                displayCurrentData();
+            }
+        }
+
+        function clearAll() {
+            if (confirm('Clear ALL data? This cannot be undone!')) {
+                localStorage.removeItem('movie_catalogue_watchlist_v1');
+                localStorage.removeItem('movie_catalogue_watched_v1');
+                alert('All data cleared!');
+                displayCurrentData();
+            }
+        }
+
+        displayCurrentData();
+    </script>
+</body>
+</html>
