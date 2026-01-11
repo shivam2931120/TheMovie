@@ -1,7 +1,21 @@
 export default function RatingBadge({ value }) {
-  if (value == null) return null;
-  const color = value >= 7.5 ? "bg-emerald-600" : value >= 6 ? "bg-yellow-600" : "bg-red-600";
+  if (!value || value === "N/A") return null;
+
+  const numValue = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(numValue)) return null;
+
+  // Color based on rating
+  const getColor = () => {
+    if (numValue >= 8) return "from-[#22C55E] to-[#16A34A]"; // Green for excellent
+    if (numValue >= 6) return "from-[#E10600] to-[#B80500]"; // Red for good
+    if (numValue >= 4) return "from-[#F59E0B] to-[#D97706]"; // Orange for average
+    return "from-[#6B7280] to-[#4B5563]"; // Gray for poor
+  };
+
   return (
-    <div className={`absolute top-2 left-2 rounded-full px-2 py-1 text-xs font-semibold text-white ${color} bg-opacity-90`}>⭐ {value?.toFixed?.(1) ?? value}</div>
+    <div className={`absolute left-2 bottom-2 z-10 flex items-center gap-1 rounded-lg bg-gradient-to-r ${getColor()} px-2 py-1 text-xs font-bold text-white shadow-lg`}>
+      <span className="text-[10px]">⭐</span>
+      <span>{numValue.toFixed(1)}</span>
+    </div>
   );
 }

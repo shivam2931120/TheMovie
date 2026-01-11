@@ -65,14 +65,22 @@ export function WatchedProvider({ children }) {
   }, [items, isSignedIn, user, isDataLoaded]);
 
   const add = useCallback((item) => {
-    const itemWithType = { ...item, type: item.type || 'movie' };
+    const itemWithType = {
+      ...item,
+      type: item.type || 'movie',
+      watchedAt: item.watchedAt || new Date().toISOString(),
+    };
     setItems((prev) => (prev.find((m) => m.id === item.id && m.type === itemWithType.type) ? prev : [itemWithType, ...prev]));
   }, []);
 
   const remove = useCallback((id, type = 'movie') => setItems((prev) => prev.filter((m) => !(m.id === id && m.type === type))), []);
 
   const toggle = useCallback((item) => {
-    const itemWithType = { ...item, type: item.type || 'movie' };
+    const itemWithType = {
+      ...item,
+      type: item.type || 'movie',
+      watchedAt: item.watchedAt || new Date().toISOString(),
+    };
     setItems((prev) => (
       prev.find((m) => m.id === item.id && m.type === itemWithType.type)
         ? prev.filter((m) => !(m.id === item.id && m.type === itemWithType.type))
