@@ -1,0 +1,19 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/calendar/page": "/calendar",
+  "/collections/page": "/collections",
+  "/discover/page": "/discover",
+  "/lists/page": "/lists",
+  "/movie/[id]/page": "/movie/[id]",
+  "/movies/page": "/movies",
+  "/page": "/",
+  "/person/[id]/page": "/person/[id]",
+  "/profile/page": "/profile",
+  "/search/page": "/search",
+  "/sign-in/[[...rest]]/page": "/sign-in/[[...rest]]",
+  "/sign-up/[[...rest]]/page": "/sign-up/[[...rest]]",
+  "/sso-callback/page": "/sso-callback",
+  "/tv/[id]/page": "/tv/[id]",
+  "/tv/page": "/tv"
+}

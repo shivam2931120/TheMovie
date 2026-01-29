@@ -1,12 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/nextjs";
+import { Heart, RotateCcw, List } from "lucide-react";
 
 const ListsContext = createContext();
 
 // Default pre-made lists
 const DEFAULT_LISTS = [
-    { id: "favorites", name: "My Favorites", icon: "❤️", isDefault: true, movies: [] },
-    { id: "to-rewatch", name: "Want to Rewatch", icon: "🔄", isDefault: true, movies: [] },
+    { id: "favorites", name: "My Favorites", icon: "Heart", isDefault: true, movies: [] },
+    { id: "to-rewatch", name: "Want to Rewatch", icon: "RotateCcw", isDefault: true, movies: [] },
 ];
 
 export function ListsProvider({ children }) {
@@ -57,7 +58,7 @@ export function ListsProvider({ children }) {
     };
 
     // Create a new list
-    const createList = async (name, icon = "📋") => {
+    const createList = async (name, icon = "List") => {
         const newList = {
             id: `list-${Date.now()}`,
             name,

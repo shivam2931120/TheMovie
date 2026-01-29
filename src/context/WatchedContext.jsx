@@ -1,105 +1,74 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { WatchedContext } from "./watched-core";
+"use client";
 
+import { createContext, useState, useEffect, useCallback, useMemo } from "react";
+import { useUser } from "@clerk/nextjs";
+
+export const WatchedContext = createContext();
 
 const STORAGE_KEY = "movie_catalogue_watched_v1";
 
 export function WatchedProvider({ children }) {
   const { user, isSignedIn, isLoaded } = useUser();
-  const [items, setItems] = useState([]);
+  const [watched, setWatched] = useState([]);
 
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-
+  // Load
   useEffect(() => {
     if (!isLoaded) return;
 
-    setIsDataLoaded(false);
-
     if (isSignedIn && user) {
       const userWatched = user.unsafeMetadata?.watched || [];
-      const migratedItems = userWatched.map(item => {
-        if (item.type) return item; // Already has type
-        const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
-        return { ...item, type: isTv ? 'tv' : 'movie' };
-      });
-      console.log('Loaded watched items (migrated):', migratedItems); // Debug
-      setItems(migratedItems);
+      setWatched(userWatched);
     } else {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        const storedItems = raw ? JSON.parse(raw) : [];
-        const migratedItems = storedItems.map(item => {
-          if (item.type) return item; // Already has type
-          const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
-          return { ...item, type: isTv ? 'tv' : 'movie' };
-        });
-        console.log('Loaded watched items from localStorage (migrated):', migratedItems); // Debug
-        setItems(migratedItems);
+        setWatched(raw ? JSON.parse(raw) : []);
       } catch {
-        setItems([]);
+        setWatched([]);
       }
     }
-
-    setIsDataLoaded(true);
   }, [isSignedIn, user, isLoaded]);
 
+  // Save
   useEffect(() => {
-    if (!isDataLoaded) return;
-
+    if (!isLoaded) return;
     if (isSignedIn && user) {
-      user
-        .update({
-          unsafeMetadata: {
-            ...user.unsafeMetadata,
-            watched: items,
-          },
-        })
-        .catch((err) => console.error("Failed to save watched:", err));
+      user.update({
+        unsafeMetadata: {
+          ...user.unsafeMetadata,
+          watched: watched
+        }
+      }).catch(err => {
+        console.error("Failed to save watched:", err);
+        // Fallback to localStorage on Clerk API errors (e.g., 429 rate limit)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(watched));
+        } catch (e) {
+          console.error("Failed to save to localStorage:", e);
+        }
+      });
     } else {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      } catch {
-      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(watched));
     }
-  }, [items, isSignedIn, user, isDataLoaded]);
+  }, [watched, isSignedIn, user, isLoaded]);
 
-  const add = useCallback((item) => {
-    const itemWithType = {
-      ...item,
-      type: item.type || 'movie',
-      watchedAt: item.watchedAt || new Date().toISOString(),
+  const addWatched = useCallback((item) => {
+    // Minify the item to save space (Clerk has 8k limit)
+    const minItem = {
+      id: item.id,
+      title: item.title || item.name,
+      poster_path: item.poster_path,
+      vote_average: item.vote_average,
+      release_date: item.release_date || item.first_air_date,
+      type: item.name ? 'tv' : 'movie'
     };
-    setItems((prev) => (prev.find((m) => m.id === item.id && m.type === itemWithType.type) ? prev : [itemWithType, ...prev]));
+    setWatched((prev) => (prev.find((m) => m.id === item.id) ? prev : [minItem, ...prev]));
   }, []);
 
-  const remove = useCallback((id, type = 'movie') => setItems((prev) => prev.filter((m) => !(m.id === id && m.type === type))), []);
+  const removeWatched = useCallback((id) => setWatched((prev) => prev.filter((m) => m.id !== id)), []);
 
-  const toggle = useCallback((item) => {
-    const itemWithType = {
-      ...item,
-      type: item.type || 'movie',
-      watchedAt: item.watchedAt || new Date().toISOString(),
-    };
-    setItems((prev) => (
-      prev.find((m) => m.id === item.id && m.type === itemWithType.type)
-        ? prev.filter((m) => !(m.id === item.id && m.type === itemWithType.type))
-        : [itemWithType, ...prev]
-    ));
-  }, []);
+  const hasWatched = useCallback((id) => watched.some((m) => m.id === id), [watched]);
 
-  const has = useCallback((id, type = 'movie') => items.some((m) => m.id === id && m.type === type), [items]);
-
-  const movies = useMemo(() => items.filter(i => i.type === 'movie' || !i.type), [items]);
-  const tvShows = useMemo(() => items.filter(i => i.type === 'tv'), [items]);
-
-  const count = items.length;
-  const watchedCount = count;
-
-  const value = useMemo(
-    () => ({ items, movies, tvShows, add, remove, toggle, has, count, watchedCount }),
-    [items, movies, tvShows, add, remove, toggle, has, count, watchedCount]
-  );
+  const value = useMemo(() => ({ watched, addWatched, removeWatched, hasWatched }), [watched, addWatched, removeWatched, hasWatched]);
 
   return <WatchedContext.Provider value={value}>{children}</WatchedContext.Provider>;
 }

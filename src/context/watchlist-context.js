@@ -10,9 +10,9 @@ export function useWatchlist() {
       movies: [],
       tvShows: [],
       count: 0,
-      add: () => {},
-      remove: () => {},
-      toggle: () => {},
+      add: () => console.warn('Watchlist context not available'),
+      remove: () => console.warn('Watchlist context not available'),
+      toggle: () => console.warn('Watchlist context not available'),
       has: () => false,
     };
   }

@@ -1,5 +1,7 @@
+"use client";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/nextjs";
 import { WatchlistContext } from "./watchlist-context";
 
 const STORAGE_KEY = "movie_catalogue_watchlist_v1";
@@ -46,7 +48,15 @@ export function WatchlistProvider({ children }) {
           ...user.unsafeMetadata,
           watchlist: items
         }
-      }).catch(err => console.error("Failed to save watchlist:", err));
+      }).catch(err => {
+        console.error("Failed to save watchlist:", err);
+        // Fallback to localStorage on Clerk API errors (e.g., 429 rate limit)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        } catch (e) {
+          console.error("Failed to save to localStorage:", e);
+        }
+      });
     } else {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
@@ -56,35 +66,51 @@ export function WatchlistProvider({ children }) {
   }, [items, isSignedIn, user, isLoaded]);
 
   const add = useCallback((item) => {
-    const itemWithType = { ...item, type: item.type || 'movie' };
-    setItems((prev) => (prev.find((m) => m.id === item.id && m.type === itemWithType.type) ? prev : [itemWithType, ...prev]));
+    // Minify for 8KB limit
+    const minItem = {
+      id: item.id,
+      title: item.title || item.name,
+      poster_path: item.poster_path,
+      vote_average: item.vote_average,
+      release_date: item.release_date || item.first_air_date,
+      type: item.type || (item.name ? 'tv' : 'movie')
+    };
+    setItems((prev) => (prev.find((m) => m.id === item.id && m.type === minItem.type) ? prev : [minItem, ...prev]));
   }, []);
-  
+
   const remove = useCallback((id, type = 'movie') => setItems((prev) => prev.filter((m) => !(m.id === id && m.type === type))), []);
-  
+
   const toggle = useCallback((item) => {
-    const itemWithType = { ...item, type: item.type || 'movie' };
+    // Minify for 8KB limit
+    const minItem = {
+      id: item.id,
+      title: item.title || item.name,
+      poster_path: item.poster_path,
+      vote_average: item.vote_average,
+      release_date: item.release_date || item.first_air_date,
+      type: item.type || (item.name ? 'tv' : 'movie')
+    };
     setItems((prev) => (
-      prev.find((m) => m.id === item.id && m.type === itemWithType.type) 
-        ? prev.filter((m) => !(m.id === item.id && m.type === itemWithType.type))
-        : [itemWithType, ...prev]
+      prev.find((m) => m.id === item.id && m.type === minItem.type)
+        ? prev.filter((m) => !(m.id === item.id && m.type === minItem.type))
+        : [minItem, ...prev]
     ));
   }, []);
-  
+
   const has = useCallback((id, type = 'movie') => items.some((m) => m.id === id && m.type === type), [items]);
 
   const movies = useMemo(() => items.filter(i => i.type === 'movie' || !i.type), [items]);
   const tvShows = useMemo(() => items.filter(i => i.type === 'tv'), [items]);
 
-  const value = useMemo(() => ({ 
-    items, 
+  const value = useMemo(() => ({
+    items,
     movies,
     tvShows,
-    add, 
-    remove, 
-    toggle, 
-    has, 
-    count: items.length 
+    add,
+    remove,
+    toggle,
+    has,
+    count: items.length
   }), [items, movies, tvShows, add, remove, toggle, has]);
   return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
 }

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/nextjs";
 
 const ReviewContext = createContext();
 
@@ -116,7 +116,17 @@ export function ReviewProvider({ children }) {
 export function useReviews() {
     const context = useContext(ReviewContext);
     if (!context) {
-        throw new Error("useReviews must be used within ReviewProvider");
+        return {
+            reviews: [],
+            loading: false,
+            addReview: async () => {},
+            updateReview: async () => {},
+            deleteReview: async () => {},
+            getReviewForMovie: () => null,
+            getAverageRating: () => 0,
+        };
     }
     return context;
 }
+
+export { ReviewContext };

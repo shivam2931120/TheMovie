@@ -1,0 +1,19 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/calendar/page": "app/calendar/page.js",
+  "/collections/page": "app/collections/page.js",
+  "/discover/page": "app/discover/page.js",
+  "/lists/page": "app/lists/page.js",
+  "/movie/[id]/page": "app/movie/[id]/page.js",
+  "/movies/page": "app/movies/page.js",
+  "/page": "app/page.js",
+  "/person/[id]/page": "app/person/[id]/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/search/page": "app/search/page.js",
+  "/sign-in/[[...rest]]/page": "app/sign-in/[[...rest]]/page.js",
+  "/sign-up/[[...rest]]/page": "app/sign-up/[[...rest]]/page.js",
+  "/sso-callback/page": "app/sso-callback/page.js",
+  "/tv/[id]/page": "app/tv/[id]/page.js",
+  "/tv/page": "app/tv/page.js"
+}

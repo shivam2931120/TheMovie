@@ -1,333 +1,179 @@
 import axios from "axios";
 
+// Constants
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
+const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
+// Cached API Key
 let cachedTmdbKey = null;
 
-async function getTmdbApiKey() {
-    if (cachedTmdbKey) return cachedTmdbKey;
-    const envKey = import.meta.env.VITE_TMDB_API_KEY;
-    if (envKey && typeof envKey === "string" && envKey.trim()) {
-        cachedTmdbKey = envKey.trim();
-        return cachedTmdbKey;
+// Helper to get API key (Priority: NEXT_PUBLIC, VITE, Process Env)
+const getApiKey = () => {
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
     }
-    throw new Error(
-        "TMDB API key is missing. Set VITE_TMDB_API_KEY in .env. Get one free at: https://www.themoviedb.org/settings/api"
-    );
+    return null;
 }
 
-// Helper to build image URLs
-export const getImageUrl = (path, size = "w500") => {
-    if (!path) return "/placeholder.png";
-    if (path.startsWith("http")) return path;
-    return `${TMDB_IMAGE_BASE}/${size}${path}`;
+// Create Axios Instance
+const api = axios.create({
+    baseURL: TMDB_BASE_URL,
+    timeout: 30000, // 30 second timeout
+    params: {
+        language: "en-US",
+    },
+});
+
+// Request Interceptor to add API Key
+api.interceptors.request.use((config) => {
+    const apiKey = getApiKey();
+    if (apiKey && apiKey !== 'your_tmdb_api_key_here') {
+        config.params = { ...config.params, api_key: apiKey };
+    }
+    return config;
+});
+
+// Robust Error Handling Wrapper
+const fetchFromApi = async (endpoint, params = {}) => {
+    try {
+        const apiKey = getApiKey();
+        if (!apiKey || apiKey === 'your_tmdb_api_key_here') {
+            console.warn(`[TMDB] Missing API Key. Returning empty data for ${endpoint}`);
+            return { results: [], total_pages: 0, total_results: 0 };
+        }
+        const { data } = await api.get(endpoint, { params });
+        return data || { results: [], total_pages: 0, total_results: 0 };
+    } catch (error) {
+        if (error.code === 'ECONNABORTED') {
+            console.error(`[TMDB] Timeout fetching ${endpoint}`);
+        } else {
+            console.error(`[TMDB] Error fetching ${endpoint}:`, error.message);
+        }
+        return { results: [], total_pages: 0, total_results: 0 }; // Return empty structure instead of null
+    }
 };
 
+// --- API Functions ---
+
+export const getTrendingMovies = (timeWindow = "day") =>
+    fetchFromApi(`/trending/movie/${timeWindow}`);
+
+export const getPopularMovies = (page = 1) =>
+    fetchFromApi("/movie/popular", { page });
+
+export const getNowPlayingMovies = (page = 1) =>
+    fetchFromApi("/movie/now_playing", { page });
+
+export const getUpcomingMovies = (page = 1) =>
+    fetchFromApi("/movie/upcoming", { page });
+
+export const getTopRatedMovies = (page = 1) =>
+    fetchFromApi("/movie/top_rated", { page });
+
+export const getMovieDetails = (id) =>
+    fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,release_dates" });
+
+export const searchMovies = (query, page = 1) =>
+    fetchFromApi("/search/movie", { query, page });
+
+export const getMovieGenres = () =>
+    fetchFromApi("/genre/movie/list");
+
+export const getDiscoverMovies = (filters = {}, page = 1) =>
+    fetchFromApi("/discover/movie", { ...filters, page });
+
+export const getDiscoverTV = (filters = {}, page = 1) =>
+    fetchFromApi("/discover/tv", { ...filters, page });
+
+export const getTVDetails = (id) =>
+    fetchFromApi(`/tv/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,content_ratings,aggregate_credits" });
+
+export const getWatchProviders = (id, type = 'movie') =>
+    fetchFromApi(`/${type}/${id}/watch/providers`);
+
+export const getTVGenres = () =>
+    fetchFromApi("/genre/tv/list");
+
+export const getTrendingTV = (timeWindow = "day") =>
+    fetchFromApi(`/trending/tv/${timeWindow}`);
+
+export const getPopularTV = (page = 1) =>
+    fetchFromApi("/tv/popular", { page });
+
+export const getTopRatedTV = (page = 1) =>
+    fetchFromApi("/tv/top_rated", { page });
+
+export const getPersonDetails = (id) =>
+    fetchFromApi(`/person/${id}`, { append_to_response: "movie_credits,tv_credits,images" });
+
+export const getMovieRecommendations = (id, page = 1) =>
+    fetchFromApi(`/movie/${id}/recommendations`, { page });
+
+export const getTVRecommendations = (id, page = 1) =>
+    fetchFromApi(`/tv/${id}/recommendations`, { page });
+
+export const getMovieVideos = (id) =>
+    fetchFromApi(`/movie/${id}/videos`);
+
+export const getTVVideos = (id) =>
+    fetchFromApi(`/tv/${id}/videos`);
+
+export const getMovieKeywords = (id) =>
+    fetchFromApi(`/movie/${id}/keywords`);
+
+export const getTVKeywords = (id) =>
+    fetchFromApi(`/tv/${id}/keywords`);
+
+export const getMovieReviews = (id, page = 1) =>
+    fetchFromApi(`/movie/${id}/reviews`, { page });
+
+export const getTVReviews = (id, page = 1) =>
+    fetchFromApi(`/tv/${id}/reviews`, { page });
+
+export const getCollection = (id) =>
+    fetchFromApi(`/collection/${id}`);
+
+export const getTVSeasonDetails = (tvId, seasonNumber) =>
+    fetchFromApi(`/tv/${tvId}/season/${seasonNumber}`);
+
+export const getTVEpisodeDetails = (tvId, seasonNumber, episodeNumber) =>
+    fetchFromApi(`/tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}`);
+
+export const getMovieAlternativeTitles = (id) =>
+    fetchFromApi(`/movie/${id}/alternative_titles`);
+
+export const getTVAlternativeTitles = (id) =>
+    fetchFromApi(`/tv/${id}/alternative_titles`);
+
+export const getMovieCertifications = (id) =>
+    fetchFromApi(`/movie/${id}/release_dates`);
+
+export const getTVContentRatings = (id) =>
+    fetchFromApi(`/tv/${id}/content_ratings`);
+
+export const getPersonMovieCredits = (id) =>
+    fetchFromApi(`/person/${id}/movie_credits`);
+
+export const getPersonTVCredits = (id) =>
+    fetchFromApi(`/person/${id}/tv_credits`);
+
+export const getPersonCombinedCredits = (id) =>
+    fetchFromApi(`/person/${id}/combined_credits`);
+
+export const getPersonExternalIds = (id) =>
+    fetchFromApi(`/person/${id}/external_ids`);
+
+// Helper to get image URL
+export const getImageUrl = (path, size = "original") => {
+    if (!path) return null;
+    return `${TMDB_IMAGE_BASE_URL}/${size}${path}`;
+};
+
+// Helper to get backdrop URL
 export const getBackdropUrl = (path) => getImageUrl(path, "original");
 
-// Movie Search
-export const searchMovies = async (query, page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/search/movie`, {
-        params: { api_key: apiKey, query, page, include_adult: false },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
+// Helper to get poster URL
+export const getPosterUrl = (path, size = "w500") => getImageUrl(path, size);
 
-// Trending Movies (weekly)
-export const getTrendingMovies = async (timeWindow = "week", page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/trending/movie/${timeWindow}`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
 
-// Popular Movies
-export const getPopularMovies = async (page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/popular`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
 
-// Now Playing Movies
-export const getNowPlayingMovies = async (page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/now_playing`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Upcoming Movies
-export const getUpcomingMovies = async (page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/upcoming`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-        dates: data.dates,
-    };
-};
-
-// Top Rated Movies
-export const getTopRatedMovies = async (page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/top_rated`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Movie Details
-export const getMovieDetails = async (movieId) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/${movieId}`, {
-        params: { api_key: apiKey, append_to_response: "credits,videos,reviews,similar,recommendations" },
-    });
-    return data;
-};
-
-// Movie Videos (Trailers)
-export const getMovieVideos = async (movieId) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/${movieId}/videos`, {
-        params: { api_key: apiKey },
-    });
-    return data.results || [];
-};
-
-// Get YouTube Trailer Key
-export const getTrailerKey = async (movieId) => {
-    const videos = await getMovieVideos(movieId);
-    const trailer = videos.find(
-        (v) => v.type === "Trailer" && v.site === "YouTube"
-    ) || videos.find((v) => v.site === "YouTube");
-    return trailer?.key || null;
-};
-
-// Similar Movies
-export const getSimilarMovies = async (movieId, page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/${movieId}/similar`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Recommended Movies
-export const getRecommendedMovies = async (movieId, page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/${movieId}/recommendations`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Movie Reviews from TMDB
-export const getMovieReviews = async (movieId, page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/movie/${movieId}/reviews`, {
-        params: { api_key: apiKey, page },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Get Genres
-export const getGenres = async () => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/genre/movie/list`, {
-        params: { api_key: apiKey },
-    });
-    return data.genres || [];
-};
-
-// Discover Movies with Filters
-export const discoverMovies = async ({
-    page = 1,
-    genreId,
-    year,
-    minRating,
-    maxRating,
-    sortBy = "popularity.desc",
-    primaryReleaseDateGte,
-    primaryReleaseDateLte,
-} = {}) => {
-    const apiKey = await getTmdbApiKey();
-    const params = {
-        api_key: apiKey,
-        page,
-        sort_by: sortBy,
-        include_adult: false,
-    };
-
-    if (genreId) params.with_genres = genreId;
-    if (year) params.primary_release_year = year;
-    if (minRating) params["vote_average.gte"] = minRating;
-    if (maxRating) params["vote_average.lte"] = maxRating;
-    if (primaryReleaseDateGte) params["primary_release_date.gte"] = primaryReleaseDateGte;
-    if (primaryReleaseDateLte) params["primary_release_date.lte"] = primaryReleaseDateLte;
-
-    const { data } = await axios.get(`${TMDB_BASE_URL}/discover/movie`, { params });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Discover by Era
-export const discoverByEra = async (era, page = 1) => {
-    const eras = {
-        "80s": { start: "1980-01-01", end: "1989-12-31" },
-        "90s": { start: "1990-01-01", end: "1999-12-31" },
-        "2000s": { start: "2000-01-01", end: "2009-12-31" },
-        "2010s": { start: "2010-01-01", end: "2019-12-31" },
-        "2020s": { start: "2020-01-01", end: "2029-12-31" },
-    };
-    const range = eras[era] || eras["2020s"];
-    return discoverMovies({
-        page,
-        primaryReleaseDateGte: range.start,
-        primaryReleaseDateLte: range.end,
-        sortBy: "vote_count.desc",
-    });
-};
-
-// Get Collection Details (MCU, etc.)
-export const getCollection = async (collectionId) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/collection/${collectionId}`, {
-        params: { api_key: apiKey },
-    });
-    return data;
-};
-
-// Pre-defined popular collections
-export const POPULAR_COLLECTIONS = [
-    { id: 529892, name: "Marvel Cinematic Universe", poster: "/yFSIUVTCvgYrpalUktulvk3Gi5Y.jpg" },
-    { id: 263, name: "The Dark Knight Collection", poster: "/bqS2lMgGkuodIXtDILFWTSWDDpa.jpg" },
-    { id: 10, name: "Star Wars Collection", poster: "/r8Ph5MYXL04Qzu4QBbq2KjqwtkQ.jpg" },
-    { id: 1241, name: "Harry Potter Collection", poster: "/eVPs2Y0LyvTLZn6AP5Z6O2rtiGB.jpg" },
-    { id: 9485, name: "The Fast and the Furious Collection", poster: "/z4ROnCrL77ZMzT0MsNXY5j25wS2.jpg" },
-    { id: 87359, name: "Mission: Impossible Collection", poster: "/geEjCGwdHjrjpAIM4vPwmDvPPsW.jpg" },
-    { id: 748, name: "X-Men Collection", poster: "/bRm2DEgUiYciDw3myHuYFInD7la.jpg" },
-    { id: 295, name: "Pirates of the Caribbean Collection", poster: "/q4X89PI7BEhjVvyHeZwrdxDVinV.jpg" },
-    { id: 656, name: "Saw Collection", poster: "/pRsmPMtOqADoMSsOAHS9j4r8FOT.jpg" },
-    { id: 2344, name: "The Matrix Collection", poster: "/bV9qTVHTVf0gkW0j7p7M0ILD4pG.jpg" },
-];
-
-// Tarantino Movies (by keyword search - approximate)
-export const getTarantinoMovies = async (page = 1) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
-        params: {
-            api_key: apiKey,
-            page,
-            with_crew: "138", // Quentin Tarantino's person ID
-            sort_by: "release_date.desc",
-        },
-    });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Oscar Best Picture Winners - using keyword/certification filters
-export const getAwardWinners = async (category = "oscar", page = 1) => {
-    // For Oscar winners, we filter by high vote count and rating
-    const apiKey = await getTmdbApiKey();
-    const params = {
-        api_key: apiKey,
-        page,
-        sort_by: "vote_count.desc",
-        "vote_average.gte": 7.5,
-        "vote_count.gte": 5000,
-    };
-
-    const { data } = await axios.get(`${TMDB_BASE_URL}/discover/movie`, { params });
-    return {
-        results: data.results || [],
-        page: data.page,
-        total_results: data.total_results,
-        total_pages: data.total_pages,
-    };
-};
-
-// Random Movie with Filters
-export const getRandomMovie = async (filters = {}) => {
-    const randomPage = Math.floor(Math.random() * 10) + 1;
-    const result = await discoverMovies({ ...filters, page: randomPage });
-    if (result.results.length === 0) return null;
-    const randomIndex = Math.floor(Math.random() * result.results.length);
-    return result.results[randomIndex];
-};
-
-// Person Search (for director filtering)
-export const searchPerson = async (query) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/search/person`, {
-        params: { api_key: apiKey, query },
-    });
-    return data.results || [];
-};
-
-// Get Person Details
-export const getPersonDetails = async (personId) => {
-    const apiKey = await getTmdbApiKey();
-    const { data } = await axios.get(`${TMDB_BASE_URL}/person/${personId}`, {
-        params: { api_key: apiKey, append_to_response: "movie_credits" },
-    });
-    return data;
-};

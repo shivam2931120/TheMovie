@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///home/shivam/TheMovie/src/app/tv/page.tsx"],"sourcesContent":["export default function TvPage() {\n    return (\n        <main className=\"min-h-screen pt-20 px-6 container mx-auto\">\n            <h1 className=\"text-4xl font-display font-bold mb-8\">TV Shows</h1>\n            <div className=\"grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5\">\n                {/* Placeholder */}\n                <div className=\"rounded-2xl bg-neutral-900 aspect-[2/3] border border-white/5\" />\n            </div>\n        </main>\n    );\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACpB,qBACI,8OAAC;QAAK,WAAU;;0BACZ,8OAAC;gBAAG,WAAU;0BAAuC;;;;;;0BACrD,8OAAC;gBAAI,WAAU;0BAEX,cAAA,8OAAC;oBAAI,WAAU;;;;;;;;;;;;;;;;;AAI/B"}}]
+}
