@@ -1,9 +1,0 @@
-{
-  "[project]/node_modules/react-confetti/dist/react-confetti.mjs [app-client] (ecmascript, next/dynamic entry)": {
-    "id": "[project]/node_modules/react-confetti/dist/react-confetti.mjs [app-client] (ecmascript, next/dynamic entry)",
-    "files": [
-      "static/chunks/node_modules_d1ebaf62._.js",
-      "static/chunks/node_modules_react-confetti_dist_react-confetti_mjs_65fb1444._.js"
-    ]
-  }
-}

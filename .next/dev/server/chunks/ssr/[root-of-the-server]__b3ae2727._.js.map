@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///home/shivam/TheMovie/src/app/calendar/page.tsx"],"sourcesContent":["export default function CalendarPage() {\n    return (\n        <main className=\"min-h-screen pt-20 px-6 container mx-auto\">\n            <h1 className=\"text-4xl font-display font-bold mb-8\">Release Calendar</h1>\n            <div className=\"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6\">\n                <div className=\"rounded-2xl border border-white/10 bg-white/5 p-6 h-64 flex items-center justify-center\">\n                    <span className=\"text-neutral-500\">Calendar View Placeholder</span>\n                </div>\n            </div>\n        </main>\n    );\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACpB,qBACI,8OAAC;QAAK,WAAU;;0BACZ,8OAAC;gBAAG,WAAU;0BAAuC;;;;;;0BACrD,8OAAC;gBAAI,WAAU;0BACX,cAAA,8OAAC;oBAAI,WAAU;8BACX,cAAA,8OAAC;wBAAK,WAAU;kCAAmB;;;;;;;;;;;;;;;;;;;;;;AAKvD"}}]
-}
