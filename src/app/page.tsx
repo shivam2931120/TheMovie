@@ -7,6 +7,8 @@ import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { useEffect, useState } from "react";
 import { getPopularMovies, getTopRatedMovies, getUpcomingMovies, getNowPlayingMovies } from "@/api/tmdb";
 
+import { PersonalizedRows } from "@/components/PersonalizedRows";
+
 export default function Home() {
     const [popular, setPopular] = useState([]);
     const [topRated, setTopRated] = useState([]);
@@ -36,7 +38,9 @@ export default function Home() {
 
             <div className="relative z-10 -mt-16 sm:-mt-20 space-y-8 sm:space-y-10">
                 <TrendingSection />
-                
+
+                <PersonalizedRows />
+
                 <RecentlyViewed />
 
                 <div className="space-y-4">

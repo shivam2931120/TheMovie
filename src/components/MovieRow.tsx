@@ -42,7 +42,7 @@ export function MovieRow({ title, movies }: MovieRowProps) {
                 className="flex gap-3 sm:gap-4 overflow-x-auto hide-scrollbar px-4 sm:px-6 lg:px-20"
             >
                 {movies.map((movie) => (
-                    <div key={movie.id} className="min-w-[140px] sm:min-w-[160px] md:min-w-[200px] lg:min-w-[240px]">
+                    <div key={movie.id} className="min-w-[160px] sm:min-w-[180px] md:min-w-[200px] lg:min-w-[240px]">
                         <MovieCard movie={movie} />
                     </div>
                 ))}

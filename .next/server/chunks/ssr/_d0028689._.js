@@ -1,3 +1,0 @@
-module.exports=[50645,a=>{a.n(a.i(27572))},43619,a=>{a.n(a.i(79962))},13718,a=>{a.n(a.i(85523))},18198,a=>{a.n(a.i(45518))},62212,a=>{a.n(a.i(66114))},41479,a=>{"use strict";var b=a.i(7997);function c(){return(0,b.jsxs)("main",{className:"min-h-screen pt-20 px-6 container mx-auto",children:[(0,b.jsx)("h1",{className:"text-4xl font-display font-bold mb-8",children:"Release Calendar"}),(0,b.jsx)("div",{className:"grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",children:(0,b.jsx)("div",{className:"rounded-2xl border border-white/10 bg-white/5 p-6 h-64 flex items-center justify-center",children:(0,b.jsx)("span",{className:"text-neutral-500",children:"Calendar View Placeholder"})})})]})}a.s(["default",()=>c])}];
-
-//# sourceMappingURL=_d0028689._.js.map

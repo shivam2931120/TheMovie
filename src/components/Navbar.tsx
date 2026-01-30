@@ -3,19 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, User, X } from "lucide-react";
+import { Search, User, X, Home } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { searchMovies } from "@/api/tmdb";
 
-const NAV_LINKS = [
-    { name: "Movies", href: "/movies" },
-    { name: "TV Shows", href: "/tv" },
-    { name: "Discover", href: "/discover" },
-    { name: "Lists", href: "/lists" },
-];
+// NAV_LINKS removed
+
 
 export function Navbar() {
     const [isScrolled, setIsScrolled] = useState(false);
@@ -35,7 +31,7 @@ export function Navbar() {
     useEffect(() => {
         const handleScroll = () => {
             const currentScrollY = window.scrollY;
-            
+
             if (isDetailPage) {
                 // On detail pages: hide navbar at top, show when scrolling
                 if (currentScrollY < 100) {
@@ -50,10 +46,10 @@ export function Navbar() {
                 setHideNavbar(false);
                 setIsScrolled(currentScrollY > 0);
             }
-            
+
             lastScrollY.current = currentScrollY;
         };
-        
+
         handleScroll(); // Run on mount
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
@@ -113,12 +109,12 @@ export function Navbar() {
                         {/* Logo */}
                         <Link href="/" className="flex items-center gap-3 relative z-50 group">
                             <div className="relative">
-                                <Image 
-                                    src="/movie.png" 
-                                    alt="TheMovie Logo" 
-                                    width={48} 
-                                    height={48} 
-                                    className="w-10 h-10 sm:w-12 sm:h-12 object-contain transition-transform group-hover:scale-110" 
+                                <Image
+                                    src="/movie.png"
+                                    alt="TheMovie Logo"
+                                    width={48}
+                                    height={48}
+                                    className="w-10 h-10 sm:w-12 sm:h-12 object-contain transition-transform group-hover:scale-110"
                                 />
                                 <div className="absolute inset-0 bg-accent-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
@@ -127,36 +123,15 @@ export function Navbar() {
                             </span>
                         </Link>
 
-                        {/* Desktop Navigation - Centered */}
-                        <div className="hidden lg:flex items-center gap-1 absolute left-1/2 transform -translate-x-1/2">
-                            {NAV_LINKS.map((link) => {
-                                const isActive = pathname === link.href;
-                                return (
-                                    <Link
-                                        key={link.name}
-                                        href={link.href}
-                                        className={clsx(
-                                            "relative px-5 py-2 text-sm font-semibold transition-all duration-300 rounded-lg group",
-                                            isActive 
-                                                ? "text-white bg-white/10" 
-                                                : "text-text-secondary hover:text-white hover:bg-white/5"
-                                        )}
-                                    >
-                                        {link.name}
-                                        {isActive && (
-                                            <motion.div
-                                                layoutId="activeNav"
-                                                className="absolute bottom-0 left-2 right-2 h-0.5 bg-accent-primary rounded-full"
-                                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                            />
-                                        )}
-                                    </Link>
-                                );
-                            })}
-                        </div>
-
                         {/* Actions */}
                         <div className="flex items-center gap-3">
+                            {/* Home Button */}
+                            <Link href="/">
+                                <button className="p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all" aria-label="Home">
+                                    <Home size={20} />
+                                </button>
+                            </Link>
+
                             {/* Search Bar */}
                             <div ref={wrapperRef} className="relative flex items-center">
                                 <AnimatePresence>
@@ -222,8 +197,8 @@ export function Navbar() {
                                     onClick={() => setShowSearch(!showSearch)}
                                     className={clsx(
                                         "p-2.5 rounded-full transition-all",
-                                        showSearch 
-                                            ? "bg-accent-primary text-white" 
+                                        showSearch
+                                            ? "bg-accent-primary text-white"
                                             : "bg-white/5 text-text-secondary hover:text-white hover:bg-white/10"
                                     )}
                                 >
@@ -246,38 +221,6 @@ export function Navbar() {
                                 </Link>
                             </SignedOut>
                         </div>
-                    </div>
-                </div>
-            </div>
-            
-            {/* Mobile Navigation */}
-            <div className="lg:hidden bg-black/50 backdrop-blur-xl border-b border-white/10">
-                <div className="container mx-auto px-4 sm:px-6">
-                    <div className="flex items-center justify-around py-3">
-                        {NAV_LINKS.map((link) => {
-                            const isActive = pathname === link.href;
-                            return (
-                                <Link
-                                    key={link.name}
-                                    href={link.href}
-                                    className={clsx(
-                                        "relative text-xs font-semibold transition-all px-3 py-2 rounded-lg",
-                                        isActive 
-                                            ? "text-white bg-white/10" 
-                                            : "text-text-secondary hover:text-white"
-                                    )}
-                                >
-                                    {link.name}
-                                    {isActive && (
-                                        <motion.div
-                                            layoutId="activeMobileNav"
-                                            className="absolute bottom-0 left-2 right-2 h-0.5 bg-accent-primary rounded-full"
-                                            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                                        />
-                                    )}
-                                </Link>
-                            );
-                        })}
                     </div>
                 </div>
             </div>

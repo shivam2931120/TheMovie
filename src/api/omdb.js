@@ -6,13 +6,13 @@ let cachedOmdbKey = null;
 
 async function getOmdbApiKey() {
   if (cachedOmdbKey) return cachedOmdbKey;
-  const envKey = import.meta.env.VITE_OMDB_API_KEY;
+  const envKey = process.env.NEXT_PUBLIC_OMDB_API_KEY;
   if (envKey && typeof envKey === "string" && envKey.trim()) {
     cachedOmdbKey = envKey.trim();
     return cachedOmdbKey;
   }
   throw new Error(
-    "OMDB API key is missing. Set VITE_OMDB_API_KEY in .env. Get one free at: https://www.omdbapi.com/apikey.aspx"
+    "OMDB API key is missing. Set NEXT_PUBLIC_OMDB_API_KEY in .env. Get one free at: https://www.omdbapi.com/apikey.aspx"
   );
 }
 
@@ -21,11 +21,11 @@ export const searchMovies = async (query, page = 1) => {
   const { data } = await axios.get(BASE_URL, {
     params: { apikey: apiKey, s: query, page, type: "movie" },
   });
-  
+
   if (data.Response === "False") {
     return { results: [], total_results: 0, page, total_pages: 0 };
   }
-  
+
   const results = (data.Search || []).map(movie => ({
     id: movie.imdbID,
     title: movie.Title,
@@ -33,7 +33,7 @@ export const searchMovies = async (query, page = 1) => {
     release_date: movie.Year,
     vote_average: null, // OMDB doesn't provide this in search
   }));
-  
+
   const totalResults = parseInt(data.totalResults) || 0;
   return {
     results,
@@ -56,11 +56,11 @@ export const getMovieDetails = async (imdbId) => {
   const { data } = await axios.get(BASE_URL, {
     params: { apikey: apiKey, i: imdbId, plot: "full" },
   });
-  
+
   if (data.Response === "False") {
     throw new Error(data.Error || "Movie not found");
   }
-  
+
   return {
     id: data.imdbID,
     title: data.Title,
@@ -116,20 +116,20 @@ export const getGenres = async () => {
 export const discoverMovies = async ({ page = 1, genreId, year } = {}) => {
   const genres = await getGenres();
   const genre = genres.find(g => g.id === parseInt(genreId));
-  
+
   let searchTerm = "movie"; // default
   if (genre) {
     searchTerm = genre.name;
   }
-  
+
   const results = await searchMovies(searchTerm, page);
-  
+
   let filtered = results.results;
-  
+
   if (year) {
     filtered = filtered.filter(m => m.release_date?.includes(year.toString()));
   }
-  
+
   return {
     results: filtered,
     page: results.page,

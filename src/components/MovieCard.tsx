@@ -8,6 +8,7 @@ import { useState, useContext } from "react";
 import clsx from "clsx";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
+import { useUser, useClerk } from "@clerk/nextjs";
 
 interface Movie {
     id: number;
@@ -26,6 +27,9 @@ interface MovieCardProps {
 }
 
 export function MovieCard({ movie, className }: MovieCardProps) {
+    const { isSignedIn } = useUser();
+    const { openSignIn } = useClerk();
+
     const [isHovered, setIsHovered] = useState(false);
     const [swipeAction, setSwipeAction] = useState<'watchlist' | 'watched' | null>(null);
     const x = useMotionValue(0);
@@ -48,6 +52,12 @@ export function MovieCard({ movie, className }: MovieCardProps) {
     const handleWatchlist = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (!isSignedIn) {
+            openSignIn();
+            return;
+        }
+
         if (isWatchlisted) {
             remove(movie.id, type);
         } else {
@@ -58,6 +68,12 @@ export function MovieCard({ movie, className }: MovieCardProps) {
     const handleWatched = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (!isSignedIn) {
+            openSignIn();
+            return;
+        }
+
         if (isWatched) {
             removeWatched(movie.id);
         } else {
@@ -142,10 +158,10 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                 {/* Cinematic Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80" />
 
-                {/* Hover Actions Overlay */}
+                {/* Hover Actions Overlay - Optimized for Touch */}
                 <div
                     className={clsx(
-                        "absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+                        "absolute inset-0 flex flex-col items-center justify-center gap-3 sm:gap-4 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
                         isHovered ? "opacity-100" : "opacity-0"
                     )}
                 >
@@ -154,35 +170,35 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                     <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="relative z-10">
                         <div className="flex gap-4">
                             <button className="text-white hover:text-accent-primary transition-colors">
-                                <PlayCircle size={40} className="drop-shadow-lg" />
+                                <PlayCircle size={32} className="sm:w-[40px] sm:h-[40px] drop-shadow-lg" />
                             </button>
                         </div>
                     </Link>
 
-                    <div className="flex gap-2 text-white relative z-10 flex-wrap justify-center px-4">
+                    <div className="flex gap-2 text-white relative z-10 flex-wrap justify-center px-2 sm:px-4">
                         <button
                             onClick={handleWatchlist}
                             className={clsx(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] sm:text-xs font-medium transition-all backdrop-blur-md",
                                 isWatchlisted
-                                    ? "bg-accent-primary border-accent-primary text-white"
-                                    : "bg-white/10 hover:bg-accent-primary hover:border-transparent border-white/20"
+                                    ? "bg-accent-primary/80 border-accent-primary text-white"
+                                    : "bg-black/30 hover:bg-accent-primary hover:border-transparent border-white/20"
                             )}
                         >
-                            {isWatchlisted ? <Check size={14} /> : <Plus size={14} />}
+                            {isWatchlisted ? <Check size={12} /> : <Plus size={12} />}
                             {isWatchlisted ? "Added" : "Watchlist"}
                         </button>
                         <button
                             onClick={handleWatched}
                             title={isWatched ? "Mark as Unwatched" : "Mark as Watched"}
                             className={clsx(
-                                "p-1.5 rounded-full border text-xs font-medium transition-all",
+                                "p-1.5 rounded-full border text-xs font-medium transition-all backdrop-blur-md",
                                 isWatched
-                                    ? "bg-green-600 border-green-600 text-white"
-                                    : "bg-white/10 hover:bg-green-600 hover:border-transparent border-white/20"
+                                    ? "bg-green-600/80 border-green-600 text-white"
+                                    : "bg-black/30 hover:bg-green-600 hover:border-transparent border-white/20"
                             )}
                         >
-                            {isWatched ? <Eye size={14} /> : <EyeOff size={14} />}
+                            {isWatched ? <Eye size={12} /> : <EyeOff size={12} />}
                         </button>
                     </div>
                 </div>

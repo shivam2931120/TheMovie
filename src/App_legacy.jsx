@@ -26,7 +26,7 @@ import { ProtectedRoute, SignInPage, SignUpPage, UserButton } from "./components
 import { FireIcon, SearchIcon, CalendarIcon, CollectionIcon, TvIcon, StarIcon, CheckIcon, ChartIcon, UserIcon, MovieIcon } from "./components/Icons";
 import { useState } from "react";
 
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 function Header() {
   const { count } = useWatchlist();

@@ -6,13 +6,13 @@ let cachedTasteDiveKey = null;
 
 async function getTasteDiveApiKey() {
   if (cachedTasteDiveKey) return cachedTasteDiveKey;
-  const envKey = import.meta.env.VITE_TASTEDIVE_API_KEY;
+  const envKey = process.env.NEXT_PUBLIC_TASTEDIVE_API_KEY;
   if (envKey && typeof envKey === "string" && envKey.trim()) {
     cachedTasteDiveKey = envKey.trim();
     return cachedTasteDiveKey;
   }
   throw new Error(
-    "TasteDive API key is missing. Set VITE_TASTEDIVE_API_KEY in .env. Get one free at: https://tastedive.com/read/api"
+    "TasteDive API key is missing. Set NEXT_PUBLIC_TASTEDIVE_API_KEY in .env. Get one free at: https://tastedive.com/read/api"
   );
 }
 

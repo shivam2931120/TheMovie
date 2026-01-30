@@ -543,7 +543,8 @@ function MovieCard({ movie, className }) {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
         className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$clsx$2f$dist$2f$clsx$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"])("relative group rounded-xl overflow-hidden cursor-pointer touch-pan-y", className),
         style: {
-            backgroundColor
+            backgroundColor,
+            x
         },
         initial: {
             opacity: 0,
@@ -565,9 +566,6 @@ function MovieCard({ movie, className }) {
         },
         dragElastic: 0.2,
         onDragEnd: handleDragEnd,
-        style: {
-            x
-        },
         children: [
             swipeAction && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["motion"].div, {
                 initial: {
@@ -588,7 +586,7 @@ function MovieCard({ movie, className }) {
                 children: swipeAction === 'watchlist' ? '✓ Added to Watchlist' : '✓ Marked as Watched'
             }, void 0, false, {
                 fileName: "[project]/src/components/MovieCard.tsx",
-                lineNumber: 114,
+                lineNumber: 113,
                 columnNumber: 17
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -602,21 +600,21 @@ function MovieCard({ movie, className }) {
                         sizes: "(max-width: 768px) 50vw, 33vw"
                     }, void 0, false, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 129,
+                        lineNumber: 128,
                         columnNumber: 21
                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "w-full h-full flex items-center justify-center text-text-muted",
                         children: "No Image"
                     }, void 0, false, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 140,
+                        lineNumber: 139,
                         columnNumber: 21
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80"
                     }, void 0, false, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 144,
+                        lineNumber: 143,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -627,7 +625,7 @@ function MovieCard({ movie, className }) {
                                 className: "absolute inset-0 z-0"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                lineNumber: 153,
+                                lineNumber: 152,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
@@ -642,22 +640,22 @@ function MovieCard({ movie, className }) {
                                             className: "drop-shadow-lg"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/MovieCard.tsx",
-                                            lineNumber: 158,
+                                            lineNumber: 157,
                                             columnNumber: 33
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/MovieCard.tsx",
-                                        lineNumber: 157,
+                                        lineNumber: 156,
                                         columnNumber: 29
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/MovieCard.tsx",
-                                    lineNumber: 156,
+                                    lineNumber: 155,
                                     columnNumber: 25
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                lineNumber: 155,
+                                lineNumber: 154,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -671,20 +669,20 @@ function MovieCard({ movie, className }) {
                                                 size: 14
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                                lineNumber: 173,
+                                                lineNumber: 172,
                                                 columnNumber: 46
                                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$plus$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Plus$3e$__["Plus"], {
                                                 size: 14
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                                lineNumber: 173,
+                                                lineNumber: 172,
                                                 columnNumber: 68
                                             }, this),
                                             isWatchlisted ? "Added" : "Watchlist"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/MovieCard.tsx",
-                                        lineNumber: 164,
+                                        lineNumber: 163,
                                         columnNumber: 25
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -695,36 +693,36 @@ function MovieCard({ movie, className }) {
                                             size: 14
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/MovieCard.tsx",
-                                            lineNumber: 186,
+                                            lineNumber: 185,
                                             columnNumber: 42
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$eye$2d$off$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__EyeOff$3e$__["EyeOff"], {
                                             size: 14
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/MovieCard.tsx",
-                                            lineNumber: 186,
+                                            lineNumber: 185,
                                             columnNumber: 62
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/MovieCard.tsx",
-                                        lineNumber: 176,
+                                        lineNumber: 175,
                                         columnNumber: 25
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                lineNumber: 163,
+                                lineNumber: 162,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 147,
+                        lineNumber: 146,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/MovieCard.tsx",
-                lineNumber: 127,
+                lineNumber: 126,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -735,7 +733,7 @@ function MovieCard({ movie, className }) {
                         children: title
                     }, void 0, false, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 194,
+                        lineNumber: 193,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -749,7 +747,7 @@ function MovieCard({ movie, className }) {
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                lineNumber: 198,
+                                lineNumber: 197,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -757,19 +755,19 @@ function MovieCard({ movie, className }) {
                                 children: year
                             }, void 0, false, {
                                 fileName: "[project]/src/components/MovieCard.tsx",
-                                lineNumber: 201,
+                                lineNumber: 200,
                                 columnNumber: 21
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/MovieCard.tsx",
-                        lineNumber: 197,
+                        lineNumber: 196,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/MovieCard.tsx",
-                lineNumber: 193,
+                lineNumber: 192,
                 columnNumber: 13
             }, this)
         ]

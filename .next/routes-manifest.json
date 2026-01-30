@@ -82,6 +82,12 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/api/ai-recommend",
+      "regex": "^/api/ai\\-recommend(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/ai\\-recommend(?:/)?$"
+    },
+    {
       "page": "/calendar",
       "regex": "^/calendar(?:/)?$",
       "routeKeys": {},
@@ -110,6 +116,12 @@
       "regex": "^/movies(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/movies(?:/)?$"
+    },
+    {
+      "page": "/movies/top-rated",
+      "regex": "^/movies/top\\-rated(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/movies/top\\-rated(?:/)?$"
     },
     {
       "page": "/profile",

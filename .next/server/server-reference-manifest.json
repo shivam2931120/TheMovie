@@ -44,6 +44,12 @@
           "exportedName": "detectKeylessEnvDriftAction",
           "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "detectKeylessEnvDriftAction",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -107,6 +113,7 @@
         "app/lists/page": "rsc",
         "app/movie/[id]/page": "rsc",
         "app/movies/page": "rsc",
+        "app/movies/top-rated/page": "rsc",
         "app/page": "rsc",
         "app/person/[id]/page": "rsc",
         "app/profile/page": "rsc",
@@ -164,6 +171,12 @@
           "exportedName": "invalidateCacheAction",
           "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "invalidateCacheAction",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/server-actions.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -227,6 +240,7 @@
         "app/lists/page": "action-browser",
         "app/movie/[id]/page": "action-browser",
         "app/movies/page": "action-browser",
+        "app/movies/top-rated/page": "action-browser",
         "app/page": "action-browser",
         "app/person/[id]/page": "action-browser",
         "app/profile/page": "action-browser",
@@ -284,6 +298,12 @@
           "exportedName": "createOrReadKeylessAction",
           "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "createOrReadKeylessAction",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -347,6 +367,7 @@
         "app/lists/page": "rsc",
         "app/movie/[id]/page": "rsc",
         "app/movies/page": "rsc",
+        "app/movies/top-rated/page": "rsc",
         "app/page": "rsc",
         "app/person/[id]/page": "rsc",
         "app/profile/page": "rsc",
@@ -404,6 +425,12 @@
           "exportedName": "collectKeylessMetadata",
           "filename": "node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "collectKeylessMetadata",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -467,6 +494,7 @@
         "app/lists/page": "rsc",
         "app/movie/[id]/page": "rsc",
         "app/movies/page": "rsc",
+        "app/movies/top-rated/page": "rsc",
         "app/page": "rsc",
         "app/person/[id]/page": "rsc",
         "app/profile/page": "rsc",
@@ -524,6 +552,12 @@
           "exportedName": "formatMetadataHeaders",
           "filename": "node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "formatMetadataHeaders",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -587,6 +621,7 @@
         "app/lists/page": "rsc",
         "app/movie/[id]/page": "rsc",
         "app/movies/page": "rsc",
+        "app/movies/top-rated/page": "rsc",
         "app/page": "rsc",
         "app/person/[id]/page": "rsc",
         "app/profile/page": "rsc",
@@ -644,6 +679,12 @@
           "exportedName": "deleteKeylessAction",
           "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "deleteKeylessAction",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -707,6 +748,7 @@
         "app/lists/page": "action-browser",
         "app/movie/[id]/page": "action-browser",
         "app/movies/page": "action-browser",
+        "app/movies/top-rated/page": "action-browser",
         "app/page": "action-browser",
         "app/person/[id]/page": "action-browser",
         "app/profile/page": "action-browser",
@@ -764,6 +806,12 @@
           "exportedName": "syncKeylessConfigAction",
           "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
         },
+        "app/movies/top-rated/page": {
+          "moduleId": 9614,
+          "async": false,
+          "exportedName": "syncKeylessConfigAction",
+          "filename": "node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js"
+        },
         "app/page": {
           "moduleId": 1470,
           "async": false,
@@ -827,6 +875,7 @@
         "app/lists/page": "action-browser",
         "app/movie/[id]/page": "action-browser",
         "app/movies/page": "action-browser",
+        "app/movies/top-rated/page": "action-browser",
         "app/page": "action-browser",
         "app/person/[id]/page": "action-browser",
         "app/profile/page": "action-browser",

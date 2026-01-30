@@ -5,12 +5,12 @@ import { getSimilarTvShows } from "./tastedive";
 // Check if an API key is available
 
 const hasTmdbKey = () => {
-  const key = import.meta.env.VITE_TMDB_API_KEY;
+  const key = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   return key && typeof key === "string" && key.trim().length > 0;
 };
 
 const hasOmdbKey = () => {
-  const key = import.meta.env.VITE_OMDB_API_KEY;
+  const key = process.env.NEXT_PUBLIC_OMDB_API_KEY;
   return key && typeof key === "string" && key.trim().length > 0;
 };
 
