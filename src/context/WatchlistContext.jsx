@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { WatchlistContext } from "./watchlist-context";
 
@@ -9,6 +9,8 @@ const STORAGE_KEY = "movie_catalogue_watchlist_v1";
 export function WatchlistProvider({ children }) {
   const { user, isSignedIn, isLoaded } = useUser();
   const [items, setItems] = useState([]);
+  const initialized = useRef(false);
+  const saveTimeout = useRef(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -16,53 +18,52 @@ export function WatchlistProvider({ children }) {
     if (isSignedIn && user) {
       const userWatchlist = user.unsafeMetadata?.watchlist || [];
       const migratedItems = userWatchlist.map(item => {
-        if (item.type) return item; // Already has type
+        if (item.type) return item;
         const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
         return { ...item, type: isTv ? 'tv' : 'movie' };
       });
-      console.log('Loaded watchlist items (migrated):', migratedItems); // Debug
       setItems(migratedItems);
     } else {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         const storedItems = raw ? JSON.parse(raw) : [];
         const migratedItems = storedItems.map(item => {
-          if (item.type) return item; // Already has type
+          if (item.type) return item;
           const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
           return { ...item, type: isTv ? 'tv' : 'movie' };
         });
-        console.log('Loaded watchlist items from localStorage (migrated):', migratedItems); // Debug
         setItems(migratedItems);
       } catch {
         setItems([]);
       }
     }
+    setTimeout(() => { initialized.current = true; }, 100);
   }, [isSignedIn, user, isLoaded]);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !initialized.current) return;
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
 
-    if (isSignedIn && user) {
-      user.update({
-        unsafeMetadata: {
-          ...user.unsafeMetadata,
-          watchlist: items
-        }
-      }).catch(err => {
-        console.error("Failed to save watchlist:", err);
-        // Fallback to localStorage on Clerk API errors (e.g., 429 rate limit)
+    saveTimeout.current = setTimeout(() => {
+      if (isSignedIn && user) {
+        user.update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            watchlist: items
+          }
+        }).catch(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+          } catch { /* ignore */ }
+        });
+      } else {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-        } catch (e) {
-          console.error("Failed to save to localStorage:", e);
-        }
-      });
-    } else {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      } catch {
+        } catch { /* ignore */ }
       }
-    }
+    }, 1000);
+
+    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [items, isSignedIn, user, isLoaded]);
 
   const add = useCallback((item) => {

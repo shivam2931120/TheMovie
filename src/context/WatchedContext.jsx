@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
 export const WatchedContext = createContext();
@@ -10,6 +10,8 @@ const STORAGE_KEY = "movie_catalogue_watched_v1";
 export function WatchedProvider({ children }) {
   const { user, isSignedIn, isLoaded } = useUser();
   const [watched, setWatched] = useState([]);
+  const initialized = useRef(false);
+  const saveTimeout = useRef(null);
 
   // Load
   useEffect(() => {
@@ -26,29 +28,35 @@ export function WatchedProvider({ children }) {
         setWatched([]);
       }
     }
+    // Mark initialized after first load
+    setTimeout(() => { initialized.current = true; }, 100);
   }, [isSignedIn, user, isLoaded]);
 
-  // Save
+  // Save (debounced, skip initial mount)
   useEffect(() => {
-    if (!isLoaded) return;
-    if (isSignedIn && user) {
-      user.update({
-        unsafeMetadata: {
-          ...user.unsafeMetadata,
-          watched: watched
-        }
-      }).catch(err => {
-        console.error("Failed to save watched:", err);
-        // Fallback to localStorage on Clerk API errors (e.g., 429 rate limit)
+    if (!isLoaded || !initialized.current) return;
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+    saveTimeout.current = setTimeout(() => {
+      if (isSignedIn && user) {
+        user.update({
+          unsafeMetadata: {
+            ...user.unsafeMetadata,
+            watched: watched
+          }
+        }).catch(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(watched));
+          } catch { /* ignore */ }
+        });
+      } else {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(watched));
-        } catch (e) {
-          console.error("Failed to save to localStorage:", e);
-        }
-      });
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(watched));
-    }
+        } catch { /* ignore */ }
+      }
+    }, 1000);
+
+    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [watched, isSignedIn, user, isLoaded]);
 
   const addWatched = useCallback((item) => {

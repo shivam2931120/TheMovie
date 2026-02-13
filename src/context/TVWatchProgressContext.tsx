@@ -1,17 +1,17 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
 export const TVWatchProgressContext = createContext<any>(null);
 
 const STORAGE_KEY = "tv_watch_progress_v1";
 
-// Progress structure: { showId: { seasonNumber: { episodeNumber: true } } }
-
 export function TVWatchProgressProvider({ children }: { children: React.ReactNode }) {
     const { user, isSignedIn, isLoaded } = useUser();
     const [progress, setProgress] = useState<Record<string, any>>({});
+    const initialized = useRef(false);
+    const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
     // Load from storage
     useEffect(() => {
@@ -28,25 +28,34 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
                 setProgress({});
             }
         }
+        setTimeout(() => { initialized.current = true; }, 100);
     }, [isSignedIn, user, isLoaded]);
 
-    // Save to storage
+    // Save to storage (debounced, skip initial mount)
     useEffect(() => {
-        if (!isLoaded) return;
+        if (!isLoaded || !initialized.current) return;
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
 
-        if (isSignedIn && user) {
-            user.update({
-                unsafeMetadata: {
-                    ...user.unsafeMetadata,
-                    tvProgress: progress
-                }
-            }).catch(err => {
-                console.warn("Failed to save TV progress to Clerk, using localStorage:", err.message || err);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-            });
-        } else {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-        }
+        saveTimeout.current = setTimeout(() => {
+            if (isSignedIn && user) {
+                user.update({
+                    unsafeMetadata: {
+                        ...user.unsafeMetadata,
+                        tvProgress: progress
+                    }
+                }).catch(() => {
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+                    } catch { /* ignore */ }
+                });
+            } else {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+                } catch { /* ignore */ }
+            }
+        }, 1000);
+
+        return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
     }, [progress, isSignedIn, user, isLoaded]);
 
     const markEpisodeWatched = useCallback((showId: number, season: number, episode: number) => {

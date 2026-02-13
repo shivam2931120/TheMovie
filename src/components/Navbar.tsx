@@ -8,7 +8,7 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { searchMovies } from "@/api/tmdb";
+import { searchMulti } from "@/api/tmdb";
 
 // NAV_LINKS removed
 
@@ -59,9 +59,14 @@ export function Navbar() {
     useEffect(() => {
         const fetchSuggestions = async () => {
             if (searchQuery.length > 2) {
-                const data = await searchMovies(searchQuery);
+                const data = await searchMulti(searchQuery);
                 if (data?.results) {
-                    setSuggestions(data.results.slice(0, 5));
+                    // Filter to movies and TV shows only, skip people
+                    setSuggestions(
+                        data.results
+                            .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
+                            .slice(0, 5)
+                    );
                 }
             } else {
                 setSuggestions([]);
@@ -126,10 +131,12 @@ export function Navbar() {
                         {/* Actions */}
                         <div className="flex items-center gap-3">
                             {/* Home Button */}
-                            <Link href="/">
-                                <button className="p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all" aria-label="Home">
-                                    <Home size={20} />
-                                </button>
+                            <Link
+                                href="/"
+                                className="p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                                aria-label="Home"
+                            >
+                                <Home size={20} />
                             </Link>
 
                             {/* Search Bar */}
@@ -138,10 +145,10 @@ export function Navbar() {
                                     {showSearch && (
                                         <motion.form
                                             initial={{ width: 0, opacity: 0 }}
-                                            animate={{ width: window.innerWidth < 640 ? 200 : 280, opacity: 1 }}
+                                            animate={{ width: "auto", opacity: 1 }}
                                             exit={{ width: 0, opacity: 0 }}
                                             onSubmit={handleSearchCheck}
-                                            className="overflow-visible mr-2 relative"
+                                            className="overflow-visible mr-2 relative w-[200px] sm:w-[280px]"
                                         >
                                             <input
                                                 type="text"
@@ -158,36 +165,48 @@ export function Navbar() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     className="absolute top-full text-start left-0 sm:left-auto sm:right-0 w-[90vw] sm:w-96 mt-2 bg-bg-card/95 backdrop-blur-xl border border-white/20 rounded-2xl overflow-hidden shadow-2xl z-50 max-h-[60vh] overflow-y-auto"
                                                 >
-                                                    {suggestions.map((movie) => (
-                                                        <Link
-                                                            key={movie.id}
-                                                            href={`/movie/${movie.id}`}
-                                                            onClick={() => {
-                                                                setShowSearch(false);
-                                                                setSuggestions([]);
-                                                                setSearchQuery("");
-                                                            }}
-                                                            className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-white/10 transition-all border-b border-white/5 last:border-0 group"
-                                                        >
-                                                            <div className="w-12 h-16 sm:w-14 sm:h-20 relative bg-neutral-800 rounded-lg overflow-hidden shrink-0 ring-2 ring-white/0 group-hover:ring-white/20 transition-all">
-                                                                {movie.poster_path && (
-                                                                    <Image
-                                                                        src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
-                                                                        alt={movie.title}
-                                                                        fill
-                                                                        className="object-cover"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-bold text-white leading-tight mb-1 line-clamp-2 group-hover:text-accent-primary transition-colors">{movie.title}</p>
-                                                                <p className="text-xs text-text-muted">{movie.release_date?.split("-")[0]}</p>
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <span className="text-xs text-yellow-500">★ {movie.vote_average?.toFixed(1)}</span>
+                                                    {suggestions.map((item: any) => {
+                                                        const isTV = item.media_type === "tv";
+                                                        const title = isTV ? item.name : item.title;
+                                                        const date = isTV ? item.first_air_date : item.release_date;
+                                                        const href = isTV ? `/tv/${item.id}` : `/movie/${item.id}`;
+                                                        return (
+                                                            <Link
+                                                                key={`${item.media_type}-${item.id}`}
+                                                                href={href}
+                                                                onClick={() => {
+                                                                    setShowSearch(false);
+                                                                    setSuggestions([]);
+                                                                    setSearchQuery("");
+                                                                }}
+                                                                className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-white/10 transition-all border-b border-white/5 last:border-0 group"
+                                                            >
+                                                                <div className="w-12 h-16 sm:w-14 sm:h-20 relative bg-neutral-800 rounded-lg overflow-hidden shrink-0 ring-2 ring-white/0 group-hover:ring-white/20 transition-all">
+                                                                    {item.poster_path && (
+                                                                        <Image
+                                                                            src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
+                                                                            alt={title || ""}
+                                                                            fill
+                                                                            sizes="56px"
+                                                                            className="object-cover"
+                                                                        />
+                                                                    )}
                                                                 </div>
-                                                            </div>
-                                                        </Link>
-                                                    ))}
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-bold text-white leading-tight mb-1 line-clamp-2 group-hover:text-accent-primary transition-colors">{title}</p>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs text-text-muted">{date?.split("-")[0]}</span>
+                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-text-secondary font-medium uppercase">
+                                                                            {isTV ? "TV" : "Movie"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 mt-1">
+                                                                        <span className="text-xs text-yellow-500">★ {item.vote_average?.toFixed(1)}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </Link>
+                                                        );
+                                                    })}
                                                 </motion.div>
                                             )}
                                         </motion.form>
@@ -196,28 +215,32 @@ export function Navbar() {
                                 <button
                                     onClick={() => setShowSearch(!showSearch)}
                                     className={clsx(
-                                        "p-2.5 rounded-full transition-all",
+                                        "p-2.5 rounded-full transition-all focus-visible:ring-2 focus-visible:ring-accent-primary",
                                         showSearch
                                             ? "bg-accent-primary text-white"
                                             : "bg-white/5 text-text-secondary hover:text-white hover:bg-white/10"
                                     )}
+                                    aria-label={showSearch ? "Close search" : "Open search"}
                                 >
                                     {showSearch ? <X size={20} /> : <Search size={20} />}
                                 </button>
                             </div>
 
                             <SignedIn>
-                                <Link href="/profile">
-                                    <button className="p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all">
-                                        <User size={20} />
-                                    </button>
+                                <Link
+                                    href="/profile"
+                                    className="p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                                    aria-label="Profile"
+                                >
+                                    <User size={20} />
                                 </Link>
                             </SignedIn>
                             <SignedOut>
-                                <Link href="/sign-in">
-                                    <button className="px-4 py-2 rounded-full bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-bold transition-all shadow-lg shadow-accent-primary/20">
-                                        Sign In
-                                    </button>
+                                <Link
+                                    href="/sign-in"
+                                    className="px-4 py-2 rounded-full bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-bold transition-all shadow-lg shadow-accent-primary/20 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                >
+                                    Sign In
                                 </Link>
                             </SignedOut>
                         </div>

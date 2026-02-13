@@ -179,11 +179,12 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                         <button
                             onClick={handleWatchlist}
                             className={clsx(
-                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] sm:text-xs font-medium transition-all backdrop-blur-md",
+                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] sm:text-xs font-medium transition-all backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white",
                                 isWatchlisted
                                     ? "bg-accent-primary/80 border-accent-primary text-white"
                                     : "bg-black/30 hover:bg-accent-primary hover:border-transparent border-white/20"
                             )}
+                            aria-label={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
                         >
                             {isWatchlisted ? <Check size={12} /> : <Plus size={12} />}
                             {isWatchlisted ? "Added" : "Watchlist"}
@@ -192,11 +193,12 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                             onClick={handleWatched}
                             title={isWatched ? "Mark as Unwatched" : "Mark as Watched"}
                             className={clsx(
-                                "p-1.5 rounded-full border text-xs font-medium transition-all backdrop-blur-md",
+                                "p-1.5 rounded-full border text-xs font-medium transition-all backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white",
                                 isWatched
                                     ? "bg-green-600/80 border-green-600 text-white"
                                     : "bg-black/30 hover:bg-green-600 hover:border-transparent border-white/20"
                             )}
+                            aria-label={isWatched ? "Mark as unwatched" : "Mark as watched"}
                         >
                             {isWatched ? <Eye size={12} /> : <EyeOff size={12} />}
                         </button>

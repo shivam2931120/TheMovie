@@ -1,10 +1,10 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Info, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Info, Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
-import { getTrendingMovies, getPopularMovies, getTopRatedMovies } from "@/api/tmdb";
+import { getTrendingMovies, getPopularMovies, getTopRatedMovies, getMovieVideos } from "@/api/tmdb";
 import Link from "next/link";
 
 export function Hero() {
@@ -12,6 +12,9 @@ export function Hero() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [direction, setDirection] = useState(1);
+    const [showTrailer, setShowTrailer] = useState(false);
+    const [trailerKey, setTrailerKey] = useState<string | null>(null);
+    const [loadingTrailer, setLoadingTrailer] = useState(false);
 
     useEffect(() => {
         async function loadHero() {
@@ -49,7 +52,7 @@ export function Hero() {
 
     // Auto-rotate through movies
     useEffect(() => {
-        if (movies.length === 0) return;
+        if (movies.length === 0 || showTrailer) return;
         
         const interval = setInterval(() => {
             setDirection(1);
@@ -57,7 +60,7 @@ export function Hero() {
         }, 8000); // Change every 8 seconds
         
         return () => clearInterval(interval);
-    }, [movies.length]);
+    }, [movies.length, showTrailer]);
 
     const goToNext = useCallback(() => {
         setDirection(1);
@@ -69,6 +72,39 @@ export function Hero() {
         setCurrentIndex((prev) => (prev - 1 + movies.length) % movies.length);
     }, [movies.length]);
 
+    const handleWatchTrailer = useCallback(async () => {
+        const movie = movies[currentIndex];
+        if (!movie) return;
+        
+        setLoadingTrailer(true);
+        try {
+            const data = await getMovieVideos(movie.id);
+            const trailer = data?.results?.find(
+                (v: any) => v.type === "Trailer" && v.site === "YouTube"
+            ) || data?.results?.find(
+                (v: any) => v.site === "YouTube"
+            );
+            
+            if (trailer) {
+                setTrailerKey(trailer.key);
+                setShowTrailer(true);
+            } else {
+                // Fallback: open YouTube search
+                window.open(
+                    `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + " official trailer")}`,
+                    "_blank"
+                );
+            }
+        } catch {
+            window.open(
+                `https://www.youtube.com/results?search_query=${encodeURIComponent(movie.title + " official trailer")}`,
+                "_blank"
+            );
+        } finally {
+            setLoadingTrailer(false);
+        }
+    }, [movies, currentIndex]);
+
     const movie = movies[currentIndex];
 
     if (loading) return <div className="h-[85vh] w-full bg-bg-main animate-pulse" />;
@@ -76,6 +112,42 @@ export function Hero() {
 
     return (
         <section className="relative h-[70vh] sm:h-[85vh] w-full overflow-hidden mt-20 sm:mt-24 z-0 group">
+            {/* Trailer Modal */}
+            <AnimatePresence>
+                {showTrailer && trailerKey && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+                        onClick={() => { setShowTrailer(false); setTrailerKey(null); }}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative w-full max-w-5xl aspect-video"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                onClick={() => { setShowTrailer(false); setTrailerKey(null); }}
+                                className="absolute -top-12 right-0 p-2 text-white hover:text-accent-primary transition-colors"
+                                aria-label="Close trailer"
+                            >
+                                <X size={28} />
+                            </button>
+                            <iframe
+                                src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0`}
+                                title="Movie Trailer"
+                                className="w-full h-full rounded-xl"
+                                allow="autoplay; encrypted-media"
+                                allowFullScreen
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Background Image with Animation */}
             <AnimatePresence initial={false} mode="wait" custom={direction}>
                 <motion.div
@@ -89,9 +161,10 @@ export function Hero() {
                 >
                     {movie.backdrop_path && (
                         <Image
-                            src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
+                            src={`https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`}
                             alt={movie.title || "Movie backdrop"}
                             fill
+                            sizes="100vw"
                             priority={currentIndex === 0}
                             className="object-cover object-center"
                         />
@@ -105,17 +178,17 @@ export function Hero() {
                 </motion.div>
             </AnimatePresence>
 
-            {/* Navigation Arrows */}
+            {/* Navigation Arrows - visible on mobile, hover on desktop */}
             <button
                 onClick={goToPrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-sm opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-primary"
                 aria-label="Previous movie"
             >
                 <ChevronLeft size={24} />
             </button>
             <button
                 onClick={goToNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-3 bg-black/50 hover:bg-black/80 text-white rounded-full backdrop-blur-sm opacity-60 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 hover:scale-110 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent-primary"
                 aria-label="Next movie"
             >
                 <ChevronRight size={24} />
@@ -173,21 +246,31 @@ export function Hero() {
 
                     {/* Buttons */}
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                        <button className="flex items-center gap-2 px-5 sm:px-8 py-2.5 sm:py-3.5 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(229,9,20,0.4)] text-sm sm:text-base">
+                        <button
+                            onClick={handleWatchTrailer}
+                            disabled={loadingTrailer}
+                            className="flex items-center gap-2 px-5 sm:px-8 py-2.5 sm:py-3.5 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(229,9,20,0.4)] text-sm sm:text-base focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:opacity-60"
+                            aria-label={`Watch trailer for ${movie.title}`}
+                        >
                             <Play fill="currentColor" size={18} />
-                            <span className="hidden xs:inline">Watch Trailer</span>
-                            <span className="xs:hidden">Trailer</span>
+                            <span className="hidden xs:inline">{loadingTrailer ? "Loading..." : "Watch Trailer"}</span>
+                            <span className="xs:hidden">{loadingTrailer ? "..." : "Trailer"}</span>
                         </button>
 
-                        <Link href={`/movie/${movie.id}`}>
-                            <button className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white/10 hover:bg-white/20 border border-white/10 backdrop-blur-md text-white font-medium rounded-lg transition-all text-sm sm:text-base">
-                                <Info size={18} />
-                                <span className="hidden xs:inline">More Info</span>
-                                <span className="xs:hidden">Info</span>
-                            </button>
+                        <Link
+                            href={`/movie/${movie.id}`}
+                            className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3.5 bg-white/10 hover:bg-white/20 border border-white/10 backdrop-blur-md text-white font-medium rounded-lg transition-all text-sm sm:text-base focus-visible:ring-2 focus-visible:ring-accent-primary"
+                            aria-label={`More info about ${movie.title}`}
+                        >
+                            <Info size={18} />
+                            <span className="hidden xs:inline">More Info</span>
+                            <span className="xs:hidden">Info</span>
                         </Link>
 
-                        <button className="p-2.5 sm:p-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-text-secondary hover:text-white transition-all">
+                        <button
+                            className="p-2.5 sm:p-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-text-secondary hover:text-white transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                            aria-label={`Add ${movie.title} to your list`}
+                        >
                             <Plus size={18} />
                         </button>
                     </div>

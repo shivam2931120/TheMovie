@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { X, ChevronDown, SlidersHorizontal, Bookmark, BookmarkCheck, Trash2, Folder } from "lucide-react";
 import { clsx } from "clsx";
 import { getMovieGenres } from "@/api/tmdb";
 
@@ -74,6 +74,31 @@ interface AdvancedFiltersProps {
     onApply?: (filters: any) => void;
 }
 
+export interface SavedSearch {
+    id: string;
+    name: string;
+    genres: number[];
+    sortBy: string;
+    yearRange: { min: number; max: number };
+    runtime: string;
+    language: string;
+    rating: string;
+    createdAt: number;
+}
+
+const SAVED_SEARCHES_KEY = "themovie_saved_searches";
+
+export function getSavedSearches(): SavedSearch[] {
+    if (typeof window === "undefined") return [];
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_SEARCHES_KEY) || "[]");
+    } catch { return []; }
+}
+
+function saveSavedSearches(searches: SavedSearch[]) {
+    localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(searches));
+}
+
 export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
     const [isOpen, setIsOpen] = useState(false);
     const router = useRouter();
@@ -86,6 +111,12 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
     const [runtime, setRuntime] = useState("");
     const [language, setLanguage] = useState("");
     const [rating, setRating] = useState("");
+
+    // Saved searches state
+    const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+    const [showSaveInput, setShowSaveInput] = useState(false);
+    const [saveName, setSaveName] = useState("");
+    const [showSavedList, setShowSavedList] = useState(false);
 
     // Initialize from URL params
     useEffect(() => {
@@ -102,6 +133,48 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
         setLanguage(searchParams.get("language") || "");
         setRating(searchParams.get("certification") || "");
     }, [searchParams]);
+
+    // Load saved searches from localStorage
+    useEffect(() => {
+        setSavedSearches(getSavedSearches());
+    }, []);
+
+    const handleSaveSearch = useCallback(() => {
+        const name = saveName.trim();
+        if (!name) return;
+        const newSearch: SavedSearch = {
+            id: Date.now().toString(36),
+            name,
+            genres: selectedGenres,
+            sortBy,
+            yearRange,
+            runtime,
+            language,
+            rating,
+            createdAt: Date.now(),
+        };
+        const updated = [...savedSearches, newSearch];
+        saveSavedSearches(updated);
+        setSavedSearches(updated);
+        setSaveName("");
+        setShowSaveInput(false);
+    }, [saveName, selectedGenres, sortBy, yearRange, runtime, language, rating, savedSearches]);
+
+    const handleDeleteSearch = useCallback((id: string) => {
+        const updated = savedSearches.filter(s => s.id !== id);
+        saveSavedSearches(updated);
+        setSavedSearches(updated);
+    }, [savedSearches]);
+
+    const handleLoadSearch = useCallback((search: SavedSearch) => {
+        setSelectedGenres(search.genres);
+        setSortBy(search.sortBy);
+        setYearRange(search.yearRange);
+        setRuntime(search.runtime);
+        setLanguage(search.language);
+        setRating(search.rating);
+        setShowSavedList(false);
+    }, []);
 
     const toggleGenre = (genreId: number) => {
         setSelectedGenres(prev =>
@@ -366,6 +439,99 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+
+                                {/* Saved Searches Section */}
+                                <div className="border-t border-white/10 pt-5">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="flex items-center gap-2 text-sm font-medium text-white">
+                                            <Folder size={16} className="text-accent-primary" />
+                                            Saved Searches ({savedSearches.length})
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowSavedList(!showSavedList); setShowSaveInput(false); }}
+                                            className="text-xs text-accent-primary hover:underline"
+                                        >
+                                            {showSavedList ? "Hide" : "Show All"}
+                                        </button>
+                                    </div>
+
+                                    {/* Save current filter set */}
+                                    {!showSaveInput ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowSaveInput(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white transition-all w-full justify-center"
+                                        >
+                                            <Bookmark size={16} />
+                                            Save Current Filters
+                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={saveName}
+                                                onChange={(e) => setSaveName(e.target.value)}
+                                                onKeyDown={(e) => e.key === "Enter" && handleSaveSearch()}
+                                                placeholder="e.g. Sci-Fi Classics"
+                                                autoFocus
+                                                className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent-primary"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleSaveSearch}
+                                                disabled={!saveName.trim()}
+                                                className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/90 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-40"
+                                            >
+                                                <BookmarkCheck size={16} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowSaveInput(false); setSaveName(""); }}
+                                                className="px-3 py-2 bg-white/5 hover:bg-white/10 text-white text-sm rounded-lg transition-all"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* List of saved searches */}
+                                    {showSavedList && savedSearches.length > 0 && (
+                                        <div className="mt-3 space-y-2 max-h-40 overflow-y-auto">
+                                            {savedSearches.map(s => (
+                                                <div key={s.id} className="flex items-center gap-2 group">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleLoadSearch(s)}
+                                                        className="flex-1 text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-white transition-all truncate"
+                                                        title={`Load: ${s.name}`}
+                                                    >
+                                                        <span className="font-medium">{s.name}</span>
+                                                        <span className="text-xs text-text-muted ml-2">
+                                                            {s.genres.length > 0
+                                                                ? s.genres.map(gid => MOVIE_GENRES.find(g => g.id === gid)?.label).filter(Boolean).slice(0, 2).join(", ")
+                                                                : "All Genres"}
+                                                            {s.genres.length > 2 && ` +${s.genres.length - 2}`}
+                                                        </span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteSearch(s.id)}
+                                                        className="p-1.5 text-white/30 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                                        aria-label={`Delete saved search: ${s.name}`}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {showSavedList && savedSearches.length === 0 && (
+                                        <p className="text-xs text-text-muted mt-2 text-center py-3">
+                                            No saved searches yet. Set your filters and save them for quick access.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>

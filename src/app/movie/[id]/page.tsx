@@ -217,11 +217,13 @@ export default function MovieDetailsPage() {
 
                                 <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm text-text-muted mb-4 lg:mb-6">
                                     {movie.vote_average && (
-                                        <span className="flex items-center gap-2 text-accent-primary font-bold">
+                                        <span className="flex items-center gap-2 text-accent-primary font-bold" title="TMDB Rating">
                                             <Star size={16} fill="currentColor" />
                                             {movie.vote_average.toFixed(1)}
+                                            <span className="text-text-muted text-xs font-normal">TMDB</span>
                                         </span>
                                     )}
+
                                     {movie.release_date && (
                                         <span className="flex items-center gap-2">
                                             <Calendar size={16} />
@@ -450,6 +452,7 @@ export default function MovieDetailsPage() {
                                                             src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
                                                             alt={company.name}
                                                             fill
+                                                            sizes="96px"
                                                             className="object-contain brightness-0 invert"
                                                         />
                                                     </div>
@@ -523,19 +526,7 @@ export default function MovieDetailsPage() {
                                             <p className="text-white font-medium">{movie.adult ? '18+' : 'All Ages'}</p>
                                         </div>
                                     )}
-                                    {movie.imdb_id && (
-                                        <div>
-                                            <p className="text-text-muted mb-1">IMDb</p>
-                                            <a
-                                                href={`https://www.imdb.com/title/${movie.imdb_id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-accent-primary hover:underline font-medium"
-                                            >
-                                                {movie.imdb_id}
-                                            </a>
-                                        </div>
-                                    )}
+
                                 </div>
                             </div>
                         </div>
@@ -557,6 +548,7 @@ export default function MovieDetailsPage() {
                                                 src={`https://image.tmdb.org/t/p/w200${actor.profile_path}`}
                                                 alt={actor.name}
                                                 fill
+                                                sizes="96px"
                                                 className="object-cover"
                                             />
                                         ) : (
@@ -708,6 +700,7 @@ export default function MovieDetailsPage() {
                                             src={`https://img.youtube.com/vi/${video.key}/mqdefault.jpg`}
                                             alt={video.name}
                                             fill
+                                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                                             className="object-cover group-hover:scale-105 transition-transform"
                                         />
                                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -725,7 +718,7 @@ export default function MovieDetailsPage() {
                     {/* Reviews & More */}
                     <div className="mt-20 space-y-12">
                         {/* AI Recommendations */}
-                        <AIRecommendations movieId={movie.id} />
+                        <AIRecommendations id={movie.id} type="movie" />
 
                         {/* Similar Movies Carousel - Improved */}
                         {similar && similar.length > 0 && (

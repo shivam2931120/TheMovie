@@ -28,10 +28,10 @@ export function MovieRow({ title, movies }: MovieRowProps) {
             <div className="container mx-auto px-4 sm:px-6 lg:px-20 flex items-center justify-between">
                 <h2 className="text-lg sm:text-xl md:text-2xl font-display font-semibold text-white">{title}</h2>
                 <div className="flex items-center gap-1 sm:gap-2">
-                    <button onClick={() => scroll("left")} className="p-1.5 sm:p-2 rounded-full bg-white/5 hover:bg-white/20 transition-colors">
+                    <button onClick={() => scroll("left")} className="p-1.5 sm:p-2 rounded-full bg-white/5 hover:bg-white/20 transition-colors focus-visible:ring-2 focus-visible:ring-accent-primary" aria-label="Scroll left">
                         <ChevronLeft size={18} className="sm:w-5 sm:h-5" />
                     </button>
-                    <button onClick={() => scroll("right")} className="p-1.5 sm:p-2 rounded-full bg-white/5 hover:bg-white/20 transition-colors">
+                    <button onClick={() => scroll("right")} className="p-1.5 sm:p-2 rounded-full bg-white/5 hover:bg-white/20 transition-colors focus-visible:ring-2 focus-visible:ring-accent-primary" aria-label="Scroll right">
                         <ChevronRight size={18} className="sm:w-5 sm:h-5" />
                     </button>
                 </div>

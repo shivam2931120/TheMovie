@@ -4,9 +4,11 @@ import { MovieCard } from "./MovieCard";
 import { useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { getTrendingMovies } from "@/api/tmdb";
+import { MovieCardSkeleton } from "./Skeletons";
 
 export function TrendingSection() {
     const [movies, setMovies] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function loadTrending() {
@@ -21,6 +23,8 @@ export function TrendingSection() {
             } catch (e) {
                 console.error("Failed to load trending movies", e);
                 setMovies(MOCK_MOVIES);
+            } finally {
+                setLoading(false);
             }
         }
         loadTrending();
@@ -39,25 +43,33 @@ export function TrendingSection() {
             <div className="container px-6 lg:px-20 mx-auto">
                 <div className="flex items-center justify-between mb-10">
                     <h2 className="font-display text-3xl font-bold text-white">Trending Now</h2>
-                    <button className="flex items-center gap-1 text-sm font-medium text-neutral-400 hover:text-white transition-colors">
+                    <button className="flex items-center gap-1 text-sm font-medium text-neutral-400 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-accent-primary rounded-lg px-2 py-1">
                         View All <ChevronRight className="h-4 w-4" />
                     </button>
                 </div>
 
                 <div className="relative -mx-6 px-6 lg:-mx-20 lg:px-20 overflow-x-auto hide-scrollbar">
                     <div className="flex gap-6 pb-4 w-max">
-                        {movies.map((movie, index) => (
-                            <div key={movie.id} className="relative w-[180px] md:w-[220px]">
-                                {/* Number Overlay */}
-                                <span className="absolute -left-4 -top-12 text-[8rem] font-bold text-white/5 font-display select-none z-0">
-                                    {index + 1}
-                                </span>
-
-                                <div className="relative z-10">
-                                    <MovieCard movie={movie} />
+                        {loading ? (
+                            [...Array(7)].map((_, i) => (
+                                <div key={i} className="relative w-[180px] md:w-[220px]">
+                                    <MovieCardSkeleton />
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        ) : (
+                            movies.map((movie, index) => (
+                                <div key={movie.id} className="relative w-[180px] md:w-[220px]">
+                                    {/* Number Overlay */}
+                                    <span className="absolute -left-4 -top-12 text-[8rem] font-bold text-white/5 font-display select-none z-0">
+                                        {index + 1}
+                                    </span>
+
+                                    <div className="relative z-10">
+                                        <MovieCard movie={movie} />
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

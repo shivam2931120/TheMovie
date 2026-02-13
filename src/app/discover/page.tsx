@@ -2,11 +2,11 @@
 
 import { Suspense } from "react";
 import { Filters } from "@/components/Filters";
-import { AdvancedFilters } from "@/components/AdvancedFilters";
+import { AdvancedFilters, getSavedSearches, type SavedSearch } from "@/components/AdvancedFilters";
 import { MovieCard } from "@/components/MovieCard";
 import { useEffect, useState } from "react";
 import { getDiscoverMovies, getMovieGenres } from "@/api/tmdb";
-import { Shuffle, Calendar, Trophy, X, Search, ChevronLeft, ChevronRight, Star, TrendingUp, Loader2 } from "lucide-react";
+import { Shuffle, Calendar, Trophy, X, Search, ChevronLeft, ChevronRight, Star, TrendingUp, Loader2, Bookmark } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 
@@ -22,8 +22,33 @@ function DiscoverContent() {
     // Random Picker State
     const [randomGenre, setRandomGenre] = useState("");
     const [randomRating, setRandomRating] = useState("");
+    const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
     const router = useRouter();
     const searchParams = useSearchParams();
+
+    // Load saved searches
+    useEffect(() => {
+        setSavedSearches(getSavedSearches());
+        // Re-check when filters panel might save 
+        const onStorage = (e: StorageEvent) => {
+            if (e.key === "themovie_saved_searches") setSavedSearches(getSavedSearches());
+        };
+        window.addEventListener("storage", onStorage);
+        return () => window.removeEventListener("storage", onStorage);
+    }, []);
+
+    const handleLoadSavedSearch = (search: SavedSearch) => {
+        const params = new URLSearchParams();
+        if (search.genres.length > 0) params.set("with_genres", search.genres.join(","));
+        if (search.sortBy !== "popularity.desc") params.set("sort_by", search.sortBy);
+        if (search.yearRange.min !== 1900) params.set("year_min", search.yearRange.min.toString());
+        if (search.yearRange.max !== new Date().getFullYear()) params.set("year_max", search.yearRange.max.toString());
+        if (search.runtime) params.set("runtime", search.runtime);
+        if (search.language) params.set("language", search.language);
+        if (search.rating) params.set("certification", search.rating);
+        params.set("page", "1");
+        router.push(`/discover?${params.toString()}`);
+    };
 
     // Fetch initial genres for random picker
     useEffect(() => {
@@ -209,6 +234,24 @@ function DiscoverContent() {
                     </button>
                     <AdvancedFilters />
                 </div>
+
+                {/* Saved Searches Quick Access */}
+                {savedSearches.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mb-6">
+                        <span className="text-xs text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
+                            <Bookmark size={12} /> Saved
+                        </span>
+                        {savedSearches.map(s => (
+                            <button
+                                key={s.id}
+                                onClick={() => handleLoadSavedSearch(s)}
+                                className="px-3 py-1.5 rounded-full text-xs font-medium bg-accent-primary/10 text-accent-primary border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors"
+                            >
+                                {s.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
 
                 {/* Random Picker Section */}
                 {showRandomPicker && (

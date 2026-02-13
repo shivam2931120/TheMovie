@@ -15,6 +15,7 @@ import { WatchedProvider } from "@/context/WatchedContext";
 import { TVWatchProgressProvider } from "@/context/TVWatchProgressContext";
 import { EasterEgg } from "@/components/EasterEgg";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 export default function RootLayout({
     children,
@@ -42,6 +43,7 @@ export default function RootLayout({
                                 <Navbar />
                                 {children}
                                 <ScrollToTop />
+                                <ServiceWorkerRegistration />
                             </TVWatchProgressProvider>
                         </WatchedProvider>
                     </Providers>

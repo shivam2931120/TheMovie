@@ -1,16 +1,18 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
 export const RecentlyViewedContext = createContext();
 
 const STORAGE_KEY = "movie_catalogue_recently_viewed_v1";
-const MAX_ITEMS = 50; // Keep last 50 viewed items
+const MAX_ITEMS = 50;
 
 export function RecentlyViewedProvider({ children }) {
     const { user, isSignedIn, isLoaded } = useUser();
     const [recentlyViewed, setRecentlyViewed] = useState([]);
+    const initialized = useRef(false);
+    const saveTimeout = useRef(null);
 
     // Load from storage
     useEffect(() => {
@@ -27,25 +29,34 @@ export function RecentlyViewedProvider({ children }) {
                 setRecentlyViewed([]);
             }
         }
+        setTimeout(() => { initialized.current = true; }, 100);
     }, [isSignedIn, user, isLoaded]);
 
-    // Save to storage
+    // Save to storage (debounced, skip initial mount)
     useEffect(() => {
-        if (!isLoaded) return;
+        if (!isLoaded || !initialized.current) return;
+        if (saveTimeout.current) clearTimeout(saveTimeout.current);
 
-        if (isSignedIn && user) {
-            user.update({
-                unsafeMetadata: {
-                    ...user.unsafeMetadata,
-                    recentlyViewed: recentlyViewed
-                }
-            }).catch(err => {
-                console.warn("Failed to save recently viewed to Clerk, using localStorage fallback:", err.message || err);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
-            });
-        } else {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
-        }
+        saveTimeout.current = setTimeout(() => {
+            if (isSignedIn && user) {
+                user.update({
+                    unsafeMetadata: {
+                        ...user.unsafeMetadata,
+                        recentlyViewed: recentlyViewed
+                    }
+                }).catch(() => {
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
+                    } catch { /* ignore */ }
+                });
+            } else {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
+                } catch { /* ignore */ }
+            }
+        }, 1500);
+
+        return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
     }, [recentlyViewed, isSignedIn, user, isLoaded]);
 
     const addToRecentlyViewed = useCallback((item) => {

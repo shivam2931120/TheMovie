@@ -10,7 +10,7 @@ interface AIRecommendationsProps {
     movieId: number;
 }
 
-export function AIRecommendations({ movieId }: AIRecommendationsProps) {
+export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: 'movie' | 'tv' }) {
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFallback, setIsFallback] = useState(false);
@@ -21,40 +21,55 @@ export function AIRecommendations({ movieId }: AIRecommendationsProps) {
         async function fetchRecommendations() {
             try {
                 setLoading(true);
-                setIsFallback(false); // Reset fallback status on new fetch
-                let movies: any[] = [];
+                setIsFallback(false);
+                let items: any[] = [];
 
-                // 1. Try Custom AI Model first
-                try {
-                    const res = await fetch(`/api/ai-recommend?movieId=${movieId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        const ids = data.recommendations || [];
+                // 1. Try Custom AI Model (Movies Only)
+                if (type === 'movie') {
+                    try {
+                        const res = await fetch(`/api/ai-recommend?movieId=${id}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            const recIds = data.recommendations || [];
 
-                        if (ids.length > 0) {
-                            // Fetch details for AI recommendations
-                            const topIds = ids.slice(0, 6);
-                            const moviePromises = topIds.map((id: number) => getMovieDetails(id).catch(() => null));
-                            const params = await Promise.all(moviePromises);
-                            movies = params.filter(m => m && m.id);
+                            if (recIds.length > 0) {
+                                const topIds = recIds.slice(0, 6);
+                                const promises = topIds.map((mid: number) => getMovieDetails(mid).catch(() => null));
+                                const results = await Promise.all(promises);
+                                items = results.filter(m => m && m.id && m.poster_path);
+                            }
                         }
+                    } catch (e) {
+                        console.warn("AI fetch failed", e);
                     }
-                } catch (e) {
-                    console.warn("AI fetch failed, using fallback", e);
                 }
 
-                // 2. Fallback to TMDB Logic if AI returned nothing (e.g. new movie not in training set)
-                if (movies.length === 0) {
-                    console.log("No AI results, fetching TMDB fallback");
+                // 2. Fallback / TV Handling
+                if (items.length === 0) {
                     setIsFallback(true);
-                    const tmdbRecs = await getMovieRecommendations(movieId);
-                    if (tmdbRecs && tmdbRecs.results) {
-                        movies = tmdbRecs.results.slice(0, 6);
+                    try {
+                        let tmdbRecs;
+                        if (type === 'movie') {
+                            tmdbRecs = await getMovieRecommendations(id);
+                        } else {
+                            // Using dynamic import or assuming getTVRecommendations is available
+                            const { getTVRecommendations } = await import('@/api/tmdb');
+                            tmdbRecs = await getTVRecommendations(id);
+                        }
+
+                        if (tmdbRecs && tmdbRecs.results) {
+                            // Filter valid items (ensure poster and name/title)
+                            items = tmdbRecs.results
+                                .filter((m: any) => m.poster_path && (m.title || m.name))
+                                .slice(0, 6);
+                        }
+                    } catch (tmdbErr) {
+                        console.warn("TMDB Fallback failed:", tmdbErr);
                     }
                 }
 
                 if (isMounted) {
-                    setRecommendations(movies);
+                    setRecommendations(items);
                 }
             } catch (err) {
                 console.error("Failed to load recommendations", err);
@@ -63,12 +78,12 @@ export function AIRecommendations({ movieId }: AIRecommendationsProps) {
             }
         }
 
-        if (movieId) {
+        if (id) {
             fetchRecommendations();
         }
 
         return () => { isMounted = false; };
-    }, [movieId]);
+    }, [id, type]);
 
     if (loading) return (
         <div className="py-8">
@@ -91,23 +106,25 @@ export function AIRecommendations({ movieId }: AIRecommendationsProps) {
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-white">
-                        AI Recommendation
+                        {type === 'movie' && !isFallback ? "AI Recommendations" : "Recommended for You"}
                     </h2>
                     <p className="text-xs text-text-muted">
-                        {isFallback ? "Recommended based on similar content" : "Based on content analysis & machine learning"}
+                        {type === 'movie' && !isFallback
+                            ? "Curated by our AI based on your viewing habits"
+                            : `Similar ${type === 'tv' ? 'TV Shows' : 'Movies'} you might like`}
                     </p>
                 </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {recommendations.map((movie, index) => (
+                {recommendations.map((item, index) => (
                     <motion.div
-                        key={movie.id}
+                        key={item.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                     >
-                        <MovieCard movie={movie} />
+                        <MovieCard movie={item} />
                     </motion.div>
                 ))}
             </div>

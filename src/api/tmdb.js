@@ -27,7 +27,7 @@ const api = axios.create({
 // Request Interceptor to add API Key
 api.interceptors.request.use((config) => {
     const apiKey = getApiKey();
-    if (apiKey && apiKey !== 'your_tmdb_api_key_here') {
+    if (apiKey && apiKey !== 'your_tmdb_api_key_here' && apiKey !== '') {
         config.params = { ...config.params, api_key: apiKey };
     }
     return config;
@@ -38,8 +38,8 @@ const fetchFromApi = async (endpoint, params = {}) => {
     try {
         const apiKey = getApiKey();
         if (!apiKey || apiKey === 'your_tmdb_api_key_here') {
-            console.warn(`[TMDB] Missing API Key. Returning empty data for ${endpoint}`);
-            return { results: [], total_pages: 0, total_results: 0 };
+            // Proceed without key (might fail for some endpoints) or log warning
+            console.warn(`[TMDB] Missing or placeholder API Key. Requests may fail.`);
         }
         const { data } = await api.get(endpoint, { params });
         return data || { results: [], total_pages: 0, total_results: 0 };
@@ -76,6 +76,9 @@ export const getMovieDetails = (id) =>
 export const searchMovies = (query, page = 1) =>
     fetchFromApi("/search/movie", { query, page });
 
+export const searchMulti = (query, page = 1) =>
+    fetchFromApi("/search/multi", { query, page });
+
 export const getMovieGenres = () =>
     fetchFromApi("/genre/movie/list");
 
@@ -86,7 +89,7 @@ export const getDiscoverTV = (filters = {}, page = 1) =>
     fetchFromApi("/discover/tv", { ...filters, page });
 
 export const getTVDetails = (id) =>
-    fetchFromApi(`/tv/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,content_ratings,aggregate_credits" });
+    fetchFromApi(`/tv/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,content_ratings,aggregate_credits,external_ids" });
 
 export const getWatchProviders = (id, type = 'movie') =>
     fetchFromApi(`/${type}/${id}/watch/providers`);

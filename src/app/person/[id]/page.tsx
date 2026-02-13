@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Calendar, MapPin, Film, Tv, ExternalLink, Instagram, Twitter, Facebook } from "lucide-react";
+import { Calendar, MapPin, Film, Tv, Instagram, Twitter, Facebook } from "lucide-react";
 import { getPersonDetails, getPersonExternalIds, getPersonCombinedCredits } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { motion } from "framer-motion";
@@ -63,6 +63,7 @@ export default function PersonPage() {
                         src={`https://image.tmdb.org/t/p/original${person.profile_path}`}
                         alt={person.name}
                         fill
+                        sizes="100vw"
                         className="object-cover object-top blur-sm opacity-30"
                     />
                 )}
@@ -129,16 +130,7 @@ export default function PersonPage() {
                                             <Facebook size={20} className="text-white" />
                                         </a>
                                     )}
-                                    {externalIds.imdb_id && (
-                                        <a
-                                            href={`https://www.imdb.com/name/${externalIds.imdb_id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all"
-                                        >
-                                            <ExternalLink size={20} className="text-white" />
-                                        </a>
-                                    )}
+
                                 </div>
                             )}
 

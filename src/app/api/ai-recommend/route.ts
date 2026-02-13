@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const movieIds = movieIdsParam ? movieIdsParam.split(',') : (movieIdParam ? [movieIdParam] : []);
 
     if (movieIds.length === 0) {
-        return NextResponse.json({ error: 'Movie ID(s) required' }, { status: 400 });
+        return NextResponse.json({ recommendations: [] });
     }
 
     try {
@@ -49,6 +49,7 @@ export async function GET(request: Request) {
 
     } catch (error) {
         console.error('AI Recommendation Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        // Fail gracefully with empty list so client can fallback
+        return NextResponse.json({ recommendations: [] }, { status: 200 });
     }
 }
