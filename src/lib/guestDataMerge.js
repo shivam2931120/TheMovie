@@ -87,21 +87,6 @@ export const mergeRatings = (accountRatings = [], guestRatings = []) => {
     return [...merged.values()].sort((a, b) => parseTime(b.updatedAt || b.createdAt) - parseTime(a.updatedAt || a.createdAt));
 };
 
-export const mergeReleaseReminders = (accountReminders = [], guestReminders = []) => {
-    const merged = new Map();
-
-    [...accountReminders, ...guestReminders].forEach((reminder) => {
-        const key = reminder?.key || `${reminder?.type || "movie"}:${reminder?.id}:${reminder?.date || ""}`;
-        if (!reminder?.id || !reminder?.date) return;
-        const existing = merged.get(key);
-        if (!existing || parseTime(reminder.updatedAt || reminder.createdAt) >= parseTime(existing.updatedAt || existing.createdAt)) {
-            merged.set(key, reminder);
-        }
-    });
-
-    return [...merged.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-};
-
 export const mergeTVProgress = (accountProgress = {}, guestProgress = {}) => {
     const merged = { ...(accountProgress || {}) };
 

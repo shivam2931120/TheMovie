@@ -8,7 +8,6 @@ import { ReviewProvider } from "@/context/ReviewContext";
 import { ListsProvider } from "@/context/ListsContext";
 import { SocialProvider } from "@/context/SocialContext";
 import { RecentlyViewedProvider } from "@/context/RecentlyViewedContext";
-import { ReminderProvider } from "@/context/ReminderContext";
 import { TVWatchProgressProvider } from "@/context/TVWatchProgressContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -20,11 +19,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                         <RecentlyViewedProvider>
                             <ReviewProvider>
                                 <ListsProvider>
-                                    <ReminderProvider>
-                                        <SocialProvider>
-                                            {children}
-                                        </SocialProvider>
-                                    </ReminderProvider>
+                                    <SocialProvider>
+                                        {children}
+                                    </SocialProvider>
                                 </ListsProvider>
                             </ReviewProvider>
                         </RecentlyViewedProvider>

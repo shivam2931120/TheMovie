@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CalendarDays, List, Search, User, X, Home } from "lucide-react";
+import { List, Search, User, X, Home } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
@@ -139,13 +139,6 @@ export function Navbar() {
                                 <Home size={20} />
                             </Link>
                             <Link
-                                href="/calendar"
-                                className="hidden sm:inline-flex p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
-                                aria-label="Release calendar"
-                            >
-                                <CalendarDays size={20} />
-                            </Link>
-                            <Link
                                 href="/lists"
                                 className="hidden sm:inline-flex p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
                                 aria-label="Custom lists"
@@ -250,12 +243,20 @@ export function Navbar() {
                                 </Link>
                             </SignedIn>
                             <SignedOut>
-                                <Link
-                                    href="/sign-in"
-                                    className="px-4 py-2 rounded-full bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-bold transition-all shadow-lg shadow-accent-primary/20 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                                >
-                                    Sign In
-                                </Link>
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href="/sign-in"
+                                        className="hidden sm:inline-flex px-3 py-2 rounded-full text-text-secondary hover:text-white hover:bg-white/10 text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                                    >
+                                        Sign in
+                                    </Link>
+                                    <Link
+                                        href="/sign-up"
+                                        className="px-4 py-2 rounded-full bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-bold transition-all shadow-lg shadow-accent-primary/20 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                                    >
+                                        Join
+                                    </Link>
+                                </div>
                             </SignedOut>
                         </div>
                     </div>

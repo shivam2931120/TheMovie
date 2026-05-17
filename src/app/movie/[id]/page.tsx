@@ -7,7 +7,6 @@ import { useParams } from "next/navigation";
 import { Play, Plus, Star, Calendar, Clock, X, Check, DollarSign, Award, MapPin, Film, Tag, List as ListIcon } from "lucide-react";
 import { getMovieDetails, getWatchProviders, getCollection } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
-import { ReminderButton } from "@/components/ReminderButton";
 import { UserRatingPanel } from "@/components/UserRatingPanel";
 import { WatchProviders } from "@/components/WatchProviders";
 import YouTube from "react-youtube";
@@ -349,15 +348,6 @@ export default function MovieDetailsPage() {
                                             </AnimatePresence>
                                         </div>
                                     </SignedIn>
-
-                                    {movie.release_date && (
-                                        <ReminderButton
-                                            item={{ ...movie, type: 'movie' }}
-                                            date={movie.release_date}
-                                            note="Movie release"
-                                            className="py-3 lg:py-4 rounded-xl"
-                                        />
-                                    )}
 
                                     <SignedOut>
                                         <button

@@ -6,7 +6,6 @@ import { useParams } from "next/navigation";
 import { Play, Plus, Star, Calendar, Clock, X, Check, Eye, EyeOff, Tag, User, List as ListIcon } from "lucide-react";
 import { getTVDetails, getTVSeasonDetails, getWatchProviders } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
-import { ReminderButton } from "@/components/ReminderButton";
 import { UserRatingPanel } from "@/components/UserRatingPanel";
 import { WatchProviders } from "@/components/WatchProviders";
 import YouTube from "react-youtube";
@@ -374,14 +373,6 @@ export default function TVDetailsPage() {
                                             </div>
                                         )}
                                     </div>
-                                    {(nextEpisode?.air_date || show.first_air_date) && (
-                                        <ReminderButton
-                                            item={{ ...show, type: 'tv' }}
-                                            date={nextEpisode?.air_date || show.first_air_date}
-                                            note={nextEpisode ? `Next episode: ${nextEpisode.name}` : "TV release"}
-                                            className="px-6 py-4 rounded-xl"
-                                        />
-                                    )}
                                 </div>
                             </div>
 
@@ -722,14 +713,6 @@ export default function TVDetailsPage() {
                                                                 {watched ? <Check size={15} /> : <EyeOff size={15} />}
                                                                 {watched ? "Watched" : "Mark Watched"}
                                                             </button>
-                                                            {episode.air_date && (
-                                                                <ReminderButton
-                                                                    item={{ ...show, title: `${show.name}: ${episode.name}`, type: 'tv' }}
-                                                                    date={episode.air_date}
-                                                                    note={`Season ${seasonDetails.season_number}, Episode ${episode.episode_number}`}
-                                                                    className="px-3 py-2 text-xs"
-                                                                />
-                                                            )}
                                                         </div>
                                                     </div>
                                                 );
