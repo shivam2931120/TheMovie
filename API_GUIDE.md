@@ -20,10 +20,10 @@ This app uses **OMDB (Open Movie Database)** for comprehensive movie data.
 1. Visit https://www.omdbapi.com/apikey.aspx
 2. Select **FREE tier** (1,000 requests/day)
 3. Verify your email
-4. Add key to `.env`:
+4. Add key to `.env.local`:
 
 ```bash
-VITE_OMDB_API_KEY=your_key_here
+NEXT_PUBLIC_OMDB_API_KEY=your_key_here
 ```
 
 ## API Functions
@@ -88,9 +88,9 @@ TasteDive provides recommendations for TV shows based on a given show title.
 
 ### Setup
 - Get your API key: https://tastedive.com/read/api
-- Add to `.env`:
+- Add to `.env.local`:
   ```
-  VITE_TASTEDIVE_API_KEY=your_key_here
+  NEXT_PUBLIC_TASTEDIVE_API_KEY=your_key_here
   ```
 
 ### Usage Example

@@ -10,6 +10,8 @@ export function ServiceWorkerRegistration() {
     const [updateAvailable, setUpdateAvailable] = useState(false);
 
     useEffect(() => {
+        let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
         // Register service worker
         if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
             navigator.serviceWorker
@@ -28,7 +30,7 @@ export function ServiceWorkerRegistration() {
                     });
 
                     // Periodic cache cleanup
-                    setInterval(() => {
+                    cleanupInterval = setInterval(() => {
                         navigator.serviceWorker.controller?.postMessage("CLEANUP");
                     }, 60 * 60 * 1000); // Every hour
                 })
@@ -55,6 +57,7 @@ export function ServiceWorkerRegistration() {
         return () => {
             window.removeEventListener("online", handleOnline);
             window.removeEventListener("offline", handleOffline);
+            if (cleanupInterval) clearInterval(cleanupInterval);
         };
     }, []);
 

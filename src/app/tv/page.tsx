@@ -10,7 +10,11 @@ import { AdvancedFilters } from "@/components/AdvancedFilters";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useInView } from "react-intersection-observer";
 import { motion } from "framer-motion";
-import clsx from "clsx";
+
+const normalizeTVSort = (sortBy: string) => {
+    const normalized = sortBy.replace("primary_release_date", "first_air_date");
+    return normalized.startsWith("revenue.") ? "popularity.desc" : normalized;
+};
 
 function TVContent() {
     const [shows, setShows] = useState<any[]>([]);
@@ -27,15 +31,16 @@ function TVContent() {
         async function loadTV() {
             setLoading(true);
             setShows([]);
-            setCurrentPage(1);
+            const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+            setCurrentPage(page);
             const genre = searchParams.get("with_genres");
-            const sortBy = searchParams.get("sort_by") || "popularity.desc";
+            const sortBy = normalizeTVSort(searchParams.get("sort_by") || "popularity.desc");
             const yearMin = searchParams.get("year_min");
             const yearMax = searchParams.get("year_max");
             const runtime = searchParams.get("runtime");
             const language = searchParams.get("language");
             
-            const filters: any = { sort_by: sortBy, page: 1 };
+            const filters: any = { sort_by: sortBy, page };
             if (genre) filters.with_genres = genre;
             if (yearMin) filters["first_air_date.gte"] = `${yearMin}-01-01`;
             if (yearMax) filters["first_air_date.lte"] = `${yearMax}-12-31`;
@@ -63,7 +68,7 @@ function TVContent() {
         async function loadMore() {
             setLoadingMore(true);
             const genre = searchParams.get("with_genres");
-            const sortBy = searchParams.get("sort_by") || "popularity.desc";
+            const sortBy = normalizeTVSort(searchParams.get("sort_by") || "popularity.desc");
             const yearMin = searchParams.get("year_min");
             const yearMax = searchParams.get("year_max");
             const runtime = searchParams.get("runtime");

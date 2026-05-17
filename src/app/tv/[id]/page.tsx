@@ -3,9 +3,12 @@
 import { useEffect, useState, useContext } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { Play, Plus, Star, Calendar, Clock, X, Check, Eye, EyeOff, Film, MessageSquare, Tag, User, ChevronLeft, ChevronRight } from "lucide-react";
-import { getTVDetails, getWatchProviders } from "@/api/tmdb";
+import { Play, Plus, Star, Calendar, Clock, X, Check, Eye, EyeOff, Tag, User, List as ListIcon } from "lucide-react";
+import { getTVDetails, getTVSeasonDetails, getWatchProviders } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
+import { ReminderButton } from "@/components/ReminderButton";
+import { UserRatingPanel } from "@/components/UserRatingPanel";
+import { WatchProviders } from "@/components/WatchProviders";
 import YouTube from "react-youtube";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
@@ -15,6 +18,7 @@ import { motion } from "framer-motion";
 import clsx from "clsx";
 import Link from "next/link";
 import { AIRecommendations } from "@/components/AIRecommendations";
+import { useLists } from "@/context/ListsContext";
 
 export default function TVDetailsPage() {
     const { id } = useParams();
@@ -25,6 +29,11 @@ export default function TVDetailsPage() {
     const [selectedRegion, setSelectedRegion] = useState('IN');
     const [selectedVideo, setSelectedVideo] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'trailers' | 'clips' | 'behind'>('trailers');
+    const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number | null>(null);
+    const [seasonDetails, setSeasonDetails] = useState<any>(null);
+    const [seasonLoading, setSeasonLoading] = useState(false);
+    const [showListDropdown, setShowListDropdown] = useState(false);
+    const [newListName, setNewListName] = useState("");
 
     // Scroll to top on mount to ensure navbar hides properly
     useEffect(() => {
@@ -37,7 +46,7 @@ export default function TVDetailsPage() {
 
     // Watched Logic
     const { hasWatched, addWatched, removeWatched } = useContext(WatchedContext) as any;
-    const isWatched = show ? hasWatched(show.id) : false;
+    const isWatched = show ? hasWatched(show.id, 'tv') : false;
 
     // Recently Viewed
     const { addToRecentlyViewed } = useContext(RecentlyViewedContext) as any;
@@ -47,11 +56,16 @@ export default function TVDetailsPage() {
     const totalEpisodes = show?.number_of_episodes || 0;
     const watchProgress = tvProgress?.getShowProgress(Number(id), totalEpisodes);
 
+    const { lists, addToList, removeFromList, isInList, createList } = useLists() as any;
+
     useEffect(() => {
         async function loadDetails() {
             if (id) {
                 try {
                     const data = await getTVDetails(id as string);
+                    if (!data?.id) {
+                        throw new Error("TV show details are unavailable. Check the TMDB API key and try again.");
+                    }
                     const providers = await getWatchProviders(id as string, 'tv');
 
                     // Get providers for selected region
@@ -59,6 +73,8 @@ export default function TVDetailsPage() {
 
                     const showData = { ...data, providers: myProviders, allProviders: providers?.results };
                     setShow(showData);
+                    const firstSeason = data?.seasons?.find((season: any) => season.season_number > 0);
+                    setSelectedSeasonNumber((current) => current ?? firstSeason?.season_number ?? null);
 
                     // Add to recently viewed
                     if (addToRecentlyViewed) {
@@ -84,6 +100,23 @@ export default function TVDetailsPage() {
         loadDetails();
     }, [id, selectedRegion, addToRecentlyViewed]);
 
+    useEffect(() => {
+        if (!id || selectedSeasonNumber === null) return;
+        let isMounted = true;
+
+        async function loadSeasonDetails() {
+            setSeasonLoading(true);
+            const data = await getTVSeasonDetails(id as string, selectedSeasonNumber);
+            if (isMounted) {
+                setSeasonDetails(data?.id ? data : null);
+                setSeasonLoading(false);
+            }
+        }
+
+        loadSeasonDetails();
+        return () => { isMounted = false; };
+    }, [id, selectedSeasonNumber]);
+
     const handleWatchlist = () => {
         if (!show) return;
         if (isWatchlisted) {
@@ -91,6 +124,25 @@ export default function TVDetailsPage() {
         } else {
             add({ ...show, type: 'tv' });
         }
+    };
+
+    const handleListToggle = (listId: string) => {
+        if (!show) return;
+        if (isInList(listId, show.id, 'tv')) {
+            removeFromList(listId, show.id, 'tv');
+        } else {
+            addToList(listId, { ...show, type: 'tv' });
+        }
+    };
+
+    const handleCreateList = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!newListName.trim()) return;
+        const list = await createList(newListName.trim());
+        if (list?.id && show) {
+            await addToList(list.id, { ...show, type: 'tv' });
+        }
+        setNewListName("");
     };
 
     if (loading) return (
@@ -117,46 +169,47 @@ export default function TVDetailsPage() {
     const handleWatched = () => {
         if (!show) return;
         if (isWatched) {
-            removeWatched(show.id);
+            removeWatched(show.id, 'tv');
         } else {
             addWatched({ ...show, type: 'tv' });
         }
     };
 
     const trailer = show?.videos?.results.find((v: any) => (v.type === "Trailer" || v.type === "Teaser") && v.site === "YouTube");
+    const activeVideo = selectedVideo || trailer;
     const cast = show?.aggregate_credits?.cast || show?.credits?.cast || [];
-    const similar = show?.similar?.results.slice(0, 5);
 
     // Organize videos by type
-    const trailers = show?.videos?.results.filter((v: any) => v.type === 'Trailer') || [];
-    const clips = show?.videos?.results.filter((v: any) => v.type === 'Clip') || [];
-    const behindScenes = show?.videos?.results.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Featurette') || [];
+    const trailers = show?.videos?.results.filter((v: any) => v.type === 'Trailer' && v.site === 'YouTube') || [];
+    const clips = show?.videos?.results.filter((v: any) => v.type === 'Clip' && v.site === 'YouTube') || [];
+    const behindScenes = show?.videos?.results.filter((v: any) => (v.type === 'Behind the Scenes' || v.type === 'Featurette') && v.site === 'YouTube') || [];
 
-    // Get reviews and keywords
-    const reviews = show?.reviews?.results || [];
+    // Get keywords and supporting metadata
     const keywords = show?.keywords?.results || [];
     const alternativeTitles = show?.alternative_titles?.results || [];
+    const nextEpisode = show?.next_episode_to_air;
+    const lastEpisode = show?.last_episode_to_air;
 
     // Get available regions for streaming
-    const availableRegions = show?.allProviders ? Object.keys(show.allProviders) : [];
+    const availableRegions = show?.allProviders ? Object.keys(show.allProviders).sort() : ['IN', 'US', 'GB', 'CA', 'AU'];
 
     return (
         <>
             <main className="min-h-screen bg-bg-main pb-20">
                 {/* Cinematic Background */}
                 <div className="relative h-[80vh] w-full overflow-hidden">
-                    {showTrailer && trailer ? (
+                    {showTrailer && activeVideo ? (
                         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-                            <div className="absolute inset-0 bg-black/90" onClick={() => setShowTrailer(false)} />
+                            <div className="absolute inset-0 bg-black/90" onClick={() => { setShowTrailer(false); setSelectedVideo(null); }} />
                             <button
-                                onClick={() => setShowTrailer(false)}
+                                onClick={() => { setShowTrailer(false); setSelectedVideo(null); }}
                                 className="absolute top-8 right-8 text-white hover:text-red-500 z-50 p-2 bg-black/50 rounded-full"
                             >
                                 <X size={32} />
                             </button>
                             <div className="relative w-full max-w-6xl aspect-video z-50 p-4">
                                 <YouTube
-                                    videoId={trailer.key}
+                                    videoId={activeVideo.key}
                                     opts={{
                                         width: '100%',
                                         height: '100%',
@@ -245,7 +298,7 @@ export default function TVDetailsPage() {
                                 <div className="flex items-center gap-4 flex-wrap">
                                     {trailer && (
                                         <button
-                                            onClick={() => setShowTrailer(true)}
+                                            onClick={() => { setSelectedVideo(trailer); setShowTrailer(true); }}
                                             className="flex items-center gap-2 px-8 py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(229,9,20,0.4)]"
                                         >
                                             <Play fill="currentColor" size={20} />
@@ -272,59 +325,103 @@ export default function TVDetailsPage() {
                                         {isWatched ? <Eye size={20} /> : <EyeOff size={20} />}
                                         {isWatched ? "Watched" : "Mark Watched"}
                                     </button>
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setShowListDropdown(!showListDropdown)}
+                                            className="flex items-center gap-2 px-6 py-4 border border-white/10 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-medium rounded-xl transition-all"
+                                        >
+                                            <ListIcon size={20} />
+                                            Add to List
+                                        </button>
+
+                                        {showListDropdown && (
+                                            <div className="absolute top-full left-0 mt-2 w-64 bg-bg-card border border-white/10 rounded-xl shadow-2xl p-4 z-50 backdrop-blur-xl">
+                                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+                                                    <h4 className="text-white font-bold text-sm">Save to List</h4>
+                                                    <button onClick={() => setShowListDropdown(false)} className="text-text-muted hover:text-white">
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+
+                                                <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
+                                                    {lists.map((list: any) => {
+                                                        const inList = isInList(list.id, show.id, 'tv');
+                                                        return (
+                                                            <button
+                                                                key={list.id}
+                                                                onClick={() => handleListToggle(list.id)}
+                                                                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-left group"
+                                                            >
+                                                                <span className="text-sm text-white group-hover:text-accent-primary transition-colors">{list.name}</span>
+                                                                {inList && <Check size={16} className="text-accent-primary" />}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <form onSubmit={handleCreateList} className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="New List..."
+                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent-primary"
+                                                        value={newListName}
+                                                        onChange={(event) => setNewListName(event.target.value)}
+                                                    />
+                                                    <button type="submit" disabled={!newListName.trim()} className="bg-accent-primary px-3 rounded-lg text-white text-xs font-bold hover:bg-accent-primary/80 disabled:opacity-50">
+                                                        +
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {(nextEpisode?.air_date || show.first_air_date) && (
+                                        <ReminderButton
+                                            item={{ ...show, type: 'tv' }}
+                                            date={nextEpisode?.air_date || show.first_air_date}
+                                            note={nextEpisode ? `Next episode: ${nextEpisode.name}` : "TV release"}
+                                            className="px-6 py-4 rounded-xl"
+                                        />
+                                    )}
                                 </div>
                             </div>
 
                             {/* Streaming Providers */}
-                            <div className="mb-0">
-                                {show?.providers && (show.providers.flatrate || show.providers.buy) ? (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="text-lg font-bold text-white">Where to Watch</h3>
-                                            <select
-                                                value={selectedRegion}
-                                                onChange={(e) => setSelectedRegion(e.target.value)}
-                                                className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-accent-primary"
-                                            >
-                                                {availableRegions.map((region) => (
-                                                    <option key={region} value={region} className="bg-bg-card">
-                                                        {region}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="flex flex-wrap gap-4">
-                                            {show.providers.flatrate?.map((provider: any) => (
-                                                <div key={provider.provider_id} className="relative group" title={`Stream on ${provider.provider_name}`}>
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10">
-                                                        <Image
-                                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                            alt={provider.provider_name}
-                                                            width={48}
-                                                            height={48}
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {show.providers.buy?.map((provider: any) => (
-                                                <div key={provider.provider_id} className="relative group" title={`Buy on ${provider.provider_name}`}>
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 opacity-80 hover:opacity-100 transition-opacity">
-                                                        <Image
-                                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                            alt={provider.provider_name}
-                                                            width={48}
-                                                            height={48}
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p className="text-xs text-text-muted mt-2">Data via JustWatch</p>
+                            <WatchProviders
+                                providers={show.providers}
+                                availableRegions={availableRegions}
+                                selectedRegion={selectedRegion}
+                                onRegionChange={setSelectedRegion}
+                            />
+
+                            <UserRatingPanel item={{ ...show, type: 'tv' }} type="tv" />
+
+                            {(nextEpisode || lastEpisode) && (
+                                <section className="bg-bg-card border border-white/10 rounded-xl p-5 sm:p-6">
+                                    <h3 className="text-lg font-bold text-white mb-4">Episode Status</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {nextEpisode && (
+                                            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                                                <p className="text-xs font-semibold uppercase text-accent-primary mb-1">Next Episode</p>
+                                                <p className="text-white font-bold">{nextEpisode.name || `Episode ${nextEpisode.episode_number}`}</p>
+                                                <p className="text-sm text-text-secondary">
+                                                    Season {nextEpisode.season_number}, Episode {nextEpisode.episode_number}
+                                                    {nextEpisode.air_date ? ` - ${new Date(`${nextEpisode.air_date}T00:00:00`).toLocaleDateString()}` : ""}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {lastEpisode && (
+                                            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                                                <p className="text-xs font-semibold uppercase text-text-muted mb-1">Last Aired</p>
+                                                <p className="text-white font-bold">{lastEpisode.name || `Episode ${lastEpisode.episode_number}`}</p>
+                                                <p className="text-sm text-text-secondary">
+                                                    Season {lastEpisode.season_number}, Episode {lastEpisode.episode_number}
+                                                    {lastEpisode.air_date ? ` - ${new Date(`${lastEpisode.air_date}T00:00:00`).toLocaleDateString()}` : ""}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                ) : null}
-                            </div>
+                                </section>
+                            )}
 
                             {/* Overview */}
                             <div>
@@ -493,7 +590,7 @@ export default function TVDetailsPage() {
                     {/* Watch Progress & Seasons */}
                     {show && show.seasons && (
                         <div className="mt-12 border-t border-white/5 pt-12">
-                            <div className="flex items-center justify-between mb-6">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
                                 <h3 className="text-xl font-display font-bold text-white">Seasons & Episodes</h3>
                                 {watchProgress && watchProgress.total > 0 && (
                                     <div className="text-sm text-text-secondary">
@@ -505,7 +602,7 @@ export default function TVDetailsPage() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="flex gap-3 overflow-x-auto horizontal-scroll pb-3 mb-6">
                                 {show.seasons.filter((s: any) => s.season_number > 0).map((season: any) => {
                                     const seasonProgress = tvProgress?.getSeasonProgress(
                                         Number(id),
@@ -513,9 +610,15 @@ export default function TVDetailsPage() {
                                         season.episode_count
                                     );
                                     return (
-                                        <div
+                                        <button
                                             key={season.id}
-                                            className="bg-bg-card border border-white/10 rounded-xl p-4 hover:border-white/20 transition-all group"
+                                            onClick={() => setSelectedSeasonNumber(season.season_number)}
+                                            className={clsx(
+                                                "w-[220px] shrink-0 rounded-xl border p-4 text-left transition-all",
+                                                selectedSeasonNumber === season.season_number
+                                                    ? "border-accent-primary bg-accent-primary/10"
+                                                    : "border-white/10 bg-bg-card hover:border-white/20"
+                                            )}
                                         >
                                             <div className="flex gap-3">
                                                 {season.poster_path && (
@@ -551,14 +654,93 @@ export default function TVDetailsPage() {
                                                     )}
                                                 </div>
                                             </div>
-                                            {season.overview && (
-                                                <p className="text-text-secondary text-xs mt-3 line-clamp-2">
-                                                    {season.overview}
-                                                </p>
-                                            )}
-                                        </div>
+                                        </button>
                                     );
                                 })}
+                            </div>
+
+                            <div className="rounded-xl border border-white/10 bg-bg-card p-5 sm:p-6">
+                                {seasonLoading ? (
+                                    <div className="space-y-3">
+                                        {Array.from({ length: 5 }, (_, index) => (
+                                            <div key={index} className="h-20 rounded-lg bg-white/5 animate-pulse" />
+                                        ))}
+                                    </div>
+                                ) : seasonDetails?.episodes?.length ? (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h4 className="text-lg font-bold text-white">{seasonDetails.name}</h4>
+                                            <p className="text-sm text-text-secondary">
+                                                {seasonDetails.air_date ? `${new Date(`${seasonDetails.air_date}T00:00:00`).getFullYear()} - ` : ""}
+                                                {seasonDetails.episodes.length} episodes
+                                            </p>
+                                        </div>
+
+                                        <div className="divide-y divide-white/10">
+                                            {seasonDetails.episodes.map((episode: any) => {
+                                                const watched = tvProgress?.isEpisodeWatched(Number(id), seasonDetails.season_number, episode.episode_number);
+                                                return (
+                                                    <div key={episode.id} className="flex flex-col gap-4 py-4 lg:flex-row lg:items-start">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                                <span className="rounded-md bg-white/5 px-2 py-1 text-xs font-bold text-text-muted">
+                                                                    E{episode.episode_number}
+                                                                </span>
+                                                                <h5 className="text-white font-bold">{episode.name || `Episode ${episode.episode_number}`}</h5>
+                                                                {episode.vote_average > 0 && (
+                                                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-accent-primary">
+                                                                        <Star size={13} fill="currentColor" />
+                                                                        {episode.vote_average.toFixed(1)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-text-muted mb-2">
+                                                                {episode.air_date ? new Date(`${episode.air_date}T00:00:00`).toLocaleDateString() : "Air date unavailable"}
+                                                                {episode.runtime ? ` - ${episode.runtime}m` : ""}
+                                                            </p>
+                                                            {episode.overview && (
+                                                                <p className="text-sm text-text-secondary line-clamp-3">{episode.overview}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (!tvProgress) return;
+                                                                    if (watched) {
+                                                                        tvProgress.unmarkEpisodeWatched(Number(id), seasonDetails.season_number, episode.episode_number);
+                                                                    } else {
+                                                                        tvProgress.markEpisodeWatched(Number(id), seasonDetails.season_number, episode.episode_number);
+                                                                    }
+                                                                }}
+                                                                className={clsx(
+                                                                    "inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all",
+                                                                    watched
+                                                                        ? "border-green-500 bg-green-600 text-white"
+                                                                        : "border-white/10 bg-white/5 text-text-secondary hover:text-white"
+                                                                )}
+                                                            >
+                                                                {watched ? <Check size={15} /> : <EyeOff size={15} />}
+                                                                {watched ? "Watched" : "Mark Watched"}
+                                                            </button>
+                                                            {episode.air_date && (
+                                                                <ReminderButton
+                                                                    item={{ ...show, title: `${show.name}: ${episode.name}`, type: 'tv' }}
+                                                                    date={episode.air_date}
+                                                                    note={`Season ${seasonDetails.season_number}, Episode ${episode.episode_number}`}
+                                                                    className="px-3 py-2 text-xs"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-sm text-text-secondary">
+                                        Episode details are unavailable for this season.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -570,25 +752,6 @@ export default function TVDetailsPage() {
                 </div>
             </main>
 
-            {/* Trailer Modal */}
-            {showTrailer && selectedVideo && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setShowTrailer(false)}>
-                    <div className="relative w-full max-w-6xl aspect-video" onClick={(e) => e.stopPropagation()}>
-                        <button
-                            onClick={() => setShowTrailer(false)}
-                            className="absolute -top-12 right-0 text-white hover:text-accent-primary transition-colors"
-                        >
-                            <X size={32} />
-                        </button>
-                        <iframe
-                            src={`https://www.youtube.com/embed/${selectedVideo.key}?autoplay=1`}
-                            className="w-full h-full rounded-xl"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                        />
-                    </div>
-                </div>
-            )}
         </>
     );
 }

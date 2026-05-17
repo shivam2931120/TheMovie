@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from 'next/dynamic';
 
 const Confetti = dynamic(() => import('react-confetti'), { ssr: false });
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
 export function EasterEgg() {
     const [showConfetti, setShowConfetti] = useState(false);
@@ -28,20 +29,17 @@ export function EasterEgg() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Konami Code: Up, Up, Down, Down, Left, Right, Left, Right, B, A
-    const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    const triggerEasterEgg = useCallback(() => {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 5000);
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key;
 
             setInputSequence((prev) => {
-                const updated = [...prev, key];
-
-                // Check if updated sequence matches the end of Konami Code
-                if (updated.length > KONAMI_CODE.length) {
-                    updated.shift();
-                }
+                const updated = [...prev, key].slice(-KONAMI_CODE.length);
 
                 if (JSON.stringify(updated) === JSON.stringify(KONAMI_CODE)) {
                     triggerEasterEgg();
@@ -54,13 +52,7 @@ export function EasterEgg() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
-
-    const triggerEasterEgg = () => {
-        setShowConfetti(true);
-        // Play sound if you have one, or just confetti
-        setTimeout(() => setShowConfetti(false), 5000);
-    };
+    }, [triggerEasterEgg]);
 
     if (!showConfetti) return null;
 

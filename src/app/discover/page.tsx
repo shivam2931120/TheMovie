@@ -5,10 +5,12 @@ import { Filters } from "@/components/Filters";
 import { AdvancedFilters, getSavedSearches, type SavedSearch } from "@/components/AdvancedFilters";
 import { MovieCard } from "@/components/MovieCard";
 import { useEffect, useState } from "react";
-import { getDiscoverMovies, getMovieGenres } from "@/api/tmdb";
-import { Shuffle, Calendar, Trophy, X, Search, ChevronLeft, ChevronRight, Star, TrendingUp, Loader2, Bookmark } from "lucide-react";
+import { getDiscoverMovies, getMovieGenres, getMovieWatchProviderList } from "@/api/tmdb";
+import { Shuffle, Calendar, Trophy, X, Search, ChevronLeft, ChevronRight, Star, TrendingUp, Loader2, Bookmark, MonitorPlay } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
+
+const REGIONS = ["IN", "US", "GB", "CA", "AU", "DE", "FR", "JP", "KR"];
 
 function DiscoverContent() {
     const [movies, setMovies] = useState<any[]>([]);
@@ -23,8 +25,18 @@ function DiscoverContent() {
     const [randomGenre, setRandomGenre] = useState("");
     const [randomRating, setRandomRating] = useState("");
     const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+    const [provider, setProvider] = useState("");
+    const [providerRegion, setProviderRegion] = useState("IN");
+    const [providers, setProviders] = useState<any[]>([]);
     const router = useRouter();
     const searchParams = useSearchParams();
+    const activeWatchProvider = searchParams.get("with_watch_providers") || "";
+    const activeWatchRegion = searchParams.get("watch_region") || "IN";
+
+    useEffect(() => {
+        setProvider(activeWatchProvider);
+        setProviderRegion(activeWatchRegion);
+    }, [activeWatchProvider, activeWatchRegion]);
 
     // Load saved searches
     useEffect(() => {
@@ -33,8 +45,13 @@ function DiscoverContent() {
         const onStorage = (e: StorageEvent) => {
             if (e.key === "themovie_saved_searches") setSavedSearches(getSavedSearches());
         };
+        const onSavedSearches = () => setSavedSearches(getSavedSearches());
         window.addEventListener("storage", onStorage);
-        return () => window.removeEventListener("storage", onStorage);
+        window.addEventListener("themovie-saved-searches", onSavedSearches);
+        return () => {
+            window.removeEventListener("storage", onStorage);
+            window.removeEventListener("themovie-saved-searches", onSavedSearches);
+        };
     }, []);
 
     const handleLoadSavedSearch = (search: SavedSearch) => {
@@ -59,6 +76,20 @@ function DiscoverContent() {
         loadGenres();
     }, []);
 
+    useEffect(() => {
+        let isMounted = true;
+
+        async function loadProviders() {
+            const data = await getMovieWatchProviderList(providerRegion);
+            if (isMounted) {
+                setProviders((data?.results || []).sort((a: any, b: any) => a.provider_name.localeCompare(b.provider_name)));
+            }
+        }
+
+        loadProviders();
+        return () => { isMounted = false; };
+    }, [providerRegion]);
+
     // Fetch Content based on URL Params (Filters)
     useEffect(() => {
         async function loadContent() {
@@ -72,11 +103,17 @@ function DiscoverContent() {
             const runtime = searchParams.get("runtime");
             const language = searchParams.get("language");
             const certification = searchParams.get("certification");
+            const watchProvider = searchParams.get("with_watch_providers");
+            const watchRegion = searchParams.get("watch_region") || "IN";
             
             setCurrentPage(page);
 
             const filters: any = { sort_by: sortBy, page };
             if (genre) filters.with_genres = genre;
+            if (watchProvider) {
+                filters.with_watch_providers = watchProvider;
+                filters.watch_region = watchRegion;
+            }
             
             // Apply advanced filters
             if (yearMin) filters["primary_release_date.gte"] = `${yearMin}-01-01`;
@@ -152,9 +189,31 @@ function DiscoverContent() {
             params.delete("preset");
         } else {
             params.set("preset", preset);
-            params.delete("genre"); // Clear genre when selecting preset for clarity
+            params.delete("with_genres"); // Clear genre when selecting preset for clarity
         }
         params.set("page", "1"); // Reset to first page
+        router.push(`/discover?${params.toString()}`);
+    };
+
+    const applyProviderFilter = () => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (provider) {
+            params.set("with_watch_providers", provider);
+            params.set("watch_region", providerRegion);
+        } else {
+            params.delete("with_watch_providers");
+            params.delete("watch_region");
+        }
+        params.set("page", "1");
+        router.push(`/discover?${params.toString()}`);
+    };
+
+    const clearProviderFilter = () => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("with_watch_providers");
+        params.delete("watch_region");
+        params.set("page", "1");
+        setProvider("");
         router.push(`/discover?${params.toString()}`);
     };
 
@@ -236,6 +295,65 @@ function DiscoverContent() {
                 </div>
 
                 {/* Saved Searches Quick Access */}
+                <div className="rounded-xl border border-white/10 bg-bg-card p-4 sm:p-5 mb-6">
+                    <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                        <div className="flex items-center gap-2 text-white lg:w-48">
+                            <MonitorPlay size={18} className="text-accent-primary" />
+                            <div>
+                                <p className="text-sm font-bold">Streaming</p>
+                                <p className="text-xs text-text-muted">Filter Discover results</p>
+                            </div>
+                        </div>
+
+                        <label className="flex-1">
+                            <span className="block text-xs font-semibold uppercase text-text-muted mb-2">Region</span>
+                            <select
+                                value={providerRegion}
+                                onChange={(event) => setProviderRegion(event.target.value)}
+                                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary focus:outline-none"
+                            >
+                                {REGIONS.map((item) => (
+                                    <option key={item} value={item} className="bg-bg-card">{item}</option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <label className="flex-[2]">
+                            <span className="block text-xs font-semibold uppercase text-text-muted mb-2">Provider</span>
+                            <select
+                                value={provider}
+                                onChange={(event) => setProvider(event.target.value)}
+                                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary focus:outline-none"
+                            >
+                                <option value="" className="bg-bg-card">Any provider</option>
+                                {providers.map((item) => (
+                                    <option key={item.provider_id} value={item.provider_id} className="bg-bg-card">{item.provider_name}</option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={applyProviderFilter}
+                                className="rounded-xl bg-accent-primary px-5 py-3 text-sm font-bold text-white transition-all hover:bg-accent-primary/90"
+                            >
+                                Apply
+                            </button>
+                            {activeWatchProvider && (
+                                <button
+                                    type="button"
+                                    onClick={clearProviderFilter}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-text-secondary transition-all hover:text-white"
+                                    aria-label="Clear streaming provider filter"
+                                >
+                                    <X size={18} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {savedSearches.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 mb-6">
                         <span className="text-xs text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
@@ -289,7 +407,7 @@ function DiscoverContent() {
                             <button
                                 onClick={handleRandomPick}
                                 disabled={loading && showRandomPicker} // Disable while picking
-                                className="w-full py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-xl transition-transform hover:scale-[1.02 shadow-lg shadow-accent-primary/20 disabled:opacity-50"
+                                className="w-full py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-xl transition-transform hover:scale-[1.02] shadow-lg shadow-accent-primary/20 disabled:opacity-50"
                             >
                                 <Shuffle size={20} className="inline mr-2" />
                                 {loading && showRandomPicker ? "Picking..." : "Pick Random Movie"}

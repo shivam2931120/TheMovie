@@ -88,7 +88,7 @@ self.addEventListener("fetch", (event) => {
     // 3. Navigation requests: Network-first with offline fallback
     if (request.mode === "navigate") {
         event.respondWith(
-            fetch(request).catch(() => caches.match("/offline") || caches.match("/"))
+            fetch(request).catch(() => caches.match("/offline").then((cached) => cached || caches.match("/")))
         );
         return;
     }

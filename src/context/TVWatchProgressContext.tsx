@@ -2,6 +2,8 @@
 
 import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { clearStoredKeys, hasGuestMergeChanges, mergeTVProgress, readStoredJson } from "@/lib/guestDataMerge";
 
 export const TVWatchProgressContext = createContext<any>(null);
 
@@ -16,14 +18,28 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
     // Load from storage
     useEffect(() => {
         if (!isLoaded) return;
+        initialized.current = false;
 
         if (isSignedIn && user) {
             const userProgress = user.unsafeMetadata?.tvProgress || {};
-            setProgress(userProgress);
+            const guestProgress = readStoredJson(STORAGE_KEY, {});
+            const mergedProgress = mergeTVProgress(userProgress, guestProgress);
+            setProgress(mergedProgress);
+
+            if (Object.keys(guestProgress).length > 0 && hasGuestMergeChanges(userProgress, mergedProgress)) {
+                saveUnsafeMetadata(user, { tvProgress: mergedProgress }).then(() => {
+                    clearStoredKeys([STORAGE_KEY]);
+                }).catch(() => {
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(guestProgress));
+                    } catch { /* ignore */ }
+                });
+            } else if (Object.keys(guestProgress).length > 0) {
+                clearStoredKeys([STORAGE_KEY]);
+            }
         } else {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                setProgress(raw ? JSON.parse(raw) : {});
+                setProgress(readStoredJson(STORAGE_KEY, {}));
             } catch {
                 setProgress({});
             }
@@ -38,12 +54,7 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
 
         saveTimeout.current = setTimeout(() => {
             if (isSignedIn && user) {
-                user.update({
-                    unsafeMetadata: {
-                        ...user.unsafeMetadata,
-                        tvProgress: progress
-                    }
-                }).catch(() => {
+                saveUnsafeMetadata(user, { tvProgress: progress }).catch(() => {
                     try {
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
                     } catch { /* ignore */ }

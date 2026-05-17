@@ -2,6 +2,8 @@
 
 import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { clearStoredKeys, hasGuestMergeChanges, mergeRecentItems, readStoredJson } from "@/lib/guestDataMerge";
 
 export const RecentlyViewedContext = createContext();
 
@@ -17,14 +19,28 @@ export function RecentlyViewedProvider({ children }) {
     // Load from storage
     useEffect(() => {
         if (!isLoaded) return;
+        initialized.current = false;
 
         if (isSignedIn && user) {
             const userRecent = user.unsafeMetadata?.recentlyViewed || [];
-            setRecentlyViewed(userRecent);
+            const guestRecent = readStoredJson(STORAGE_KEY, []);
+            const mergedRecent = mergeRecentItems(userRecent, guestRecent, MAX_ITEMS);
+            setRecentlyViewed(mergedRecent);
+
+            if (guestRecent.length > 0 && hasGuestMergeChanges(userRecent, mergedRecent)) {
+                saveUnsafeMetadata(user, { recentlyViewed: mergedRecent }).then(() => {
+                    clearStoredKeys([STORAGE_KEY]);
+                }).catch(() => {
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(guestRecent));
+                    } catch { /* ignore */ }
+                });
+            } else if (guestRecent.length > 0) {
+                clearStoredKeys([STORAGE_KEY]);
+            }
         } else {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
-                setRecentlyViewed(raw ? JSON.parse(raw) : []);
+                setRecentlyViewed(readStoredJson(STORAGE_KEY, []));
             } catch {
                 setRecentlyViewed([]);
             }
@@ -39,12 +55,7 @@ export function RecentlyViewedProvider({ children }) {
 
         saveTimeout.current = setTimeout(() => {
             if (isSignedIn && user) {
-                user.update({
-                    unsafeMetadata: {
-                        ...user.unsafeMetadata,
-                        recentlyViewed: recentlyViewed
-                    }
-                }).catch(() => {
+                saveUnsafeMetadata(user, { recentlyViewed }).catch(() => {
                     try {
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
                     } catch { /* ignore */ }

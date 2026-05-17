@@ -15,10 +15,10 @@
 
 1. In Clerk Dashboard, go to **API Keys**
 2. Copy your **Publishable Key** (starts with `pk_test_...` or `pk_live_...`)
-3. Add it to your `.env` file:
+3. Add it to your `.env.local` file:
 
 ```env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
 ```
 
 ### 3. Configure Clerk Paths
@@ -45,7 +45,7 @@ In Clerk Dashboard → **User & Authentication** → **Social Connections**:
    npm run dev
    ```
 
-2. Open http://localhost:5173
+2. Open http://localhost:3000
 
 3. Click "Sign In" button
 
@@ -89,8 +89,8 @@ In Clerk Dashboard → **User & Authentication** → **Social Connections**:
 1. Go to https://vercel.com
 2. Import your GitHub repository
 3. Add environment variables:
-   - `VITE_TMDB_API_KEY` = your TMDB key
-   - `VITE_CLERK_PUBLISHABLE_KEY` = your Clerk key
+   - `NEXT_PUBLIC_TMDB_API_KEY` = your TMDB key
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` = your Clerk key
 4. Deploy!
 
 ### Option 2: Vercel CLI
@@ -106,8 +106,8 @@ vercel login
 vercel
 
 # Add environment variables
-vercel env add VITE_TMDB_API_KEY
-vercel env add VITE_CLERK_PUBLISHABLE_KEY
+vercel env add NEXT_PUBLIC_TMDB_API_KEY
+vercel env add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 # Deploy to production
 vercel --prod
@@ -120,7 +120,7 @@ vercel --prod
 **Problem**: Yellow warning box saying Clerk key is missing
 
 **Solution**: 
-1. Check your `.env` file has `VITE_CLERK_PUBLISHABLE_KEY`
+1. Check your `.env.local` file has `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 2. Restart your dev server: `npm run dev`
 3. Make sure the key starts with `pk_test_` or `pk_live_`
 
@@ -148,7 +148,7 @@ vercel --prod
 **Problem**: Movies not loading
 
 **Solution**:
-1. Check `VITE_TMDB_API_KEY` is set in `.env`
+1. Check `NEXT_PUBLIC_TMDB_API_KEY` is set in `.env.local`
 2. Verify your TMDB API key is valid
 3. Check browser console for API errors
 4. Try clearing filters (Year: 2025 + Rating: 9+ might have no results)
@@ -165,8 +165,8 @@ See: https://clerk.com/docs/integrations/webhooks
 
 ## Security Notes
 
-- ✅ Never commit `.env` file (it's in `.gitignore`)
-- ✅ Use `VITE_` prefix for client-side env vars
+- ✅ Never commit `.env.local` (it's in `.gitignore`)
+- ✅ Use `NEXT_PUBLIC_` prefix for browser-readable Next.js env vars
 - ✅ Clerk keys starting with `pk_` are safe for client-side
 - ⚠️ Never expose secret keys (starting with `sk_`) in client code
 

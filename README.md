@@ -1,6 +1,6 @@
 # TheMovie - Movie Catalogue App
 
-A modern React movie catalogue application powered by **OMDB API** with user authentication and watchlist features.
+A modern Next.js movie catalogue application powered by **TMDB**, with Clerk authentication and watchlist features.
 
 ## Features
 
@@ -26,12 +26,12 @@ A modern React movie catalogue application powered by **OMDB API** with user aut
 
 ## Tech Stack
 
-- **React 19** + **Vite 7** - Fast, modern dev experience
+- **Next.js 16** + **React 19** - App Router and production-ready rendering
 - **Tailwind CSS v4** - Styling with PostCSS
 - **Clerk** - User authentication
-- **OMDB API** - Movie data and metadata
+- **TMDB API** - Movie, TV, trailer, cast, provider, and collection data
+- **OMDB API** - Optional enrichment and fallback metadata
 - **Axios** - HTTP client
-- **React Router** - Navigation
 
 ## Getting Started
 
@@ -57,11 +57,12 @@ npm install
 
 ### 3. Environment Setup
 
-Create `.env` file:
+Create `.env.local`:
 
 ```bash
-VITE_OMDB_API_KEY=your_omdb_key_here
-VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
+NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_key_here
+NEXT_PUBLIC_OMDB_API_KEY=your_omdb_key_here
 ```
 
 ### 4. Run Development Server
@@ -70,7 +71,7 @@ VITE_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
 npm run dev
 ```
 
-Visit http://localhost:5173
+Visit http://localhost:3000
 
 ## Project Structure
 
@@ -109,14 +110,15 @@ vercel --prod
 ```
 
 Add environment variables in Vercel dashboard:
-- `VITE_OMDB_API_KEY`
-- `VITE_CLERK_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_TMDB_API_KEY`
+- `NEXT_PUBLIC_OMDB_API_KEY` (optional)
 
 ### Build for Production
 
 ```bash
 npm run build
-npm run preview
+npm start
 ```
 
 ## Clerk Configuration

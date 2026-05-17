@@ -1,11 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Info, Plus, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Play, Info, Plus, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useContext } from "react";
 import { getTrendingMovies, getPopularMovies, getTopRatedMovies, getMovieVideos } from "@/api/tmdb";
 import Link from "next/link";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { WatchlistContext } from "@/context/watchlist-context";
 
 export function Hero() {
     const [movies, setMovies] = useState<any[]>([]);
@@ -15,6 +17,9 @@ export function Hero() {
     const [showTrailer, setShowTrailer] = useState(false);
     const [trailerKey, setTrailerKey] = useState<string | null>(null);
     const [loadingTrailer, setLoadingTrailer] = useState(false);
+    const { isSignedIn } = useUser();
+    const { openSignIn } = useClerk();
+    const { has, add, remove } = useContext(WatchlistContext) as any;
 
     useEffect(() => {
         async function loadHero() {
@@ -106,6 +111,20 @@ export function Hero() {
     }, [movies, currentIndex]);
 
     const movie = movies[currentIndex];
+    const isWatchlisted = movie ? has(movie.id, "movie") : false;
+
+    const handleWatchlist = useCallback(() => {
+        if (!movie) return;
+        if (!isSignedIn) {
+            openSignIn();
+            return;
+        }
+        if (isWatchlisted) {
+            remove(movie.id, "movie");
+        } else {
+            add({ ...movie, type: "movie" });
+        }
+    }, [movie, isSignedIn, isWatchlisted, openSignIn, add, remove]);
 
     if (loading) return <div className="h-[85vh] w-full bg-bg-main animate-pulse" />;
     if (!movie) return null;
@@ -268,10 +287,11 @@ export function Hero() {
                         </Link>
 
                         <button
+                            onClick={handleWatchlist}
                             className="p-2.5 sm:p-3.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-text-secondary hover:text-white transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
-                            aria-label={`Add ${movie.title} to your list`}
+                            aria-label={isWatchlisted ? `Remove ${movie.title} from your list` : `Add ${movie.title} to your list`}
                         >
-                            <Plus size={18} />
+                            {isWatchlisted ? <Check size={18} /> : <Plus size={18} />}
                         </button>
                     </div>
                     </>

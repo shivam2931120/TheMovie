@@ -11,6 +11,8 @@ import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
 import { MovieCard } from "@/components/MovieCard";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { useRatings } from "@/context/ReviewContext";
 
 // Genre name mapping for TMDB IDs
 const GENRE_MAP: Record<number, string> = {
@@ -18,6 +20,54 @@ const GENRE_MAP: Record<number, string> = {
     99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
     27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Sci-Fi",
     10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
+    10759: "Action & Adventure", 10762: "Kids", 10763: "News", 10764: "Reality",
+    10765: "Sci-Fi & Fantasy", 10766: "Soap", 10767: "Talk", 10768: "War & Politics",
+};
+
+const getPosterSrc = (path?: string | null, size = "w92") => {
+    if (!path) return null;
+    return path.startsWith("http") ? path : `https://image.tmdb.org/t/p/${size}${path}`;
+};
+
+const readLocalProfilePreferences = () => {
+    const savedBio = localStorage.getItem("user_bio") || "";
+    let savedGenres: string[] = [];
+
+    try {
+        savedGenres = JSON.parse(localStorage.getItem("user_favorite_genres") || "[]");
+    } catch {
+        localStorage.removeItem("user_favorite_genres");
+    }
+
+    return { bio: savedBio, favoriteGenres: savedGenres };
+};
+
+const clearLocalProfilePreferences = () => {
+    localStorage.removeItem("user_bio");
+    localStorage.removeItem("user_favorite_genres");
+};
+
+const getRatingGenreNames = (rating: any) => {
+    const item = rating.item || {};
+    const genreNames = new Set<string>();
+
+    if (Array.isArray(item.genres)) {
+        item.genres.forEach((genre: any) => {
+            if (typeof genre === "string") genreNames.add(genre);
+            if (genre?.name) genreNames.add(genre.name);
+            if (genre?.id && GENRE_MAP[genre.id]) genreNames.add(GENRE_MAP[genre.id]);
+        });
+    }
+
+    const ids = [
+        ...(Array.isArray(item.genre_ids) ? item.genre_ids : []),
+        ...(Array.isArray(item.genreIds) ? item.genreIds : []),
+    ];
+    ids.forEach((id) => {
+        if (GENRE_MAP[id]) genreNames.add(GENRE_MAP[id]);
+    });
+
+    return [...genreNames].filter(Boolean);
 };
 
 export default function ProfilePage() {
@@ -26,29 +76,80 @@ export default function ProfilePage() {
     const { items } = useContext(WatchlistContext) as any;
     const { watched } = useContext(WatchedContext) as any;
     const { recentlyViewed } = useContext(RecentlyViewedContext) as any;
+    const { ratings } = useRatings() as any;
     const [bio, setBio] = useState("");
     const [isEditingBio, setIsEditingBio] = useState(false);
     const [activeTab, setActiveTab] = useState<'watchlist' | 'watched' | 'activity'>('watchlist');
     const [favoriteGenres, setFavoriteGenres] = useState<string[]>([]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const savedBio = localStorage.getItem("user_bio");
-            if (savedBio) setBio(savedBio);
-            const savedGenres = localStorage.getItem("user_favorite_genres");
-            if (savedGenres) setFavoriteGenres(JSON.parse(savedGenres));
+        if (!isLoaded || typeof window === 'undefined') return;
+
+        const localPreferences = readLocalProfilePreferences();
+        const metadataPreferences = isSignedIn && user
+            ? (user.unsafeMetadata?.profilePreferences as { bio?: string; favoriteGenres?: string[] } | undefined)
+            : undefined;
+
+        const metadataGenres = Array.isArray(metadataPreferences?.favoriteGenres)
+            ? metadataPreferences.favoriteGenres
+            : [];
+        const mergedGenres = [...new Set([...metadataGenres, ...localPreferences.favoriteGenres])].slice(0, 5);
+        const nextBio = metadataPreferences?.bio ?? localPreferences.bio;
+        const nextGenres = isSignedIn && user ? mergedGenres : localPreferences.favoriteGenres;
+
+        setBio(nextBio);
+        setFavoriteGenres(nextGenres);
+
+        if (isSignedIn && user && (localPreferences.bio || localPreferences.favoriteGenres.length > 0)) {
+            const needsMerge = metadataPreferences?.bio !== nextBio
+                || JSON.stringify(metadataGenres) !== JSON.stringify(nextGenres);
+
+            if (needsMerge) {
+                void saveUnsafeMetadata(user, (current) => ({
+                    ...current,
+                    profilePreferences: {
+                        ...((current.profilePreferences as Record<string, unknown> | undefined) || {}),
+                        bio: nextBio,
+                        favoriteGenres: nextGenres,
+                    },
+                })).then(clearLocalProfilePreferences).catch((error) => {
+                    console.error("Failed to merge guest profile preferences into Clerk:", error);
+                });
+            } else {
+                clearLocalProfilePreferences();
+            }
         }
-    }, []);
+    }, [isLoaded, isSignedIn, user]);
+
+    const saveProfilePreferences = (nextBio: string, nextGenres: string[]) => {
+        if (isSignedIn && user) {
+            void saveUnsafeMetadata(user, (current) => ({
+                ...current,
+                profilePreferences: {
+                    ...((current.profilePreferences as Record<string, unknown> | undefined) || {}),
+                    bio: nextBio,
+                    favoriteGenres: nextGenres,
+                },
+            })).catch((error) => {
+                console.error("Failed to save profile preferences to Clerk:", error);
+                localStorage.setItem("user_bio", nextBio);
+                localStorage.setItem("user_favorite_genres", JSON.stringify(nextGenres));
+            });
+        } else {
+            localStorage.setItem("user_bio", nextBio);
+            localStorage.setItem("user_favorite_genres", JSON.stringify(nextGenres));
+        }
+    };
 
     const saveBio = () => {
         setIsEditingBio(false);
-        localStorage.setItem("user_bio", bio);
+        saveProfilePreferences(bio, favoriteGenres);
     };
 
     const toggleFavoriteGenre = (genre: string) => {
         setFavoriteGenres(prev => {
             const next = prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre].slice(0, 5);
-            localStorage.setItem("user_favorite_genres", JSON.stringify(next));
+            saveProfilePreferences(bio, next);
             return next;
         });
     };
@@ -90,6 +191,55 @@ export default function ProfilePage() {
 
         return { hours, totalMinutes, avgRating, topGenres, maxGenreCount, topDecades, uniqueMovies };
     }, [watched]);
+
+    const ratingStats = useMemo(() => {
+        const validRatings = Array.isArray(ratings)
+            ? ratings.filter((entry: any) => Number(entry.rating) > 0)
+            : [];
+
+        if (validRatings.length === 0) {
+            return {
+                count: 0,
+                average: 0,
+                distribution: Array.from({ length: 10 }, (_, index) => ({ score: index + 1, count: 0 })),
+                maxDistribution: 1,
+                topGenres: [] as Array<{ name: string; count: number; average: number }>,
+            };
+        }
+
+        const total = validRatings.reduce((sum: number, entry: any) => sum + Number(entry.rating || 0), 0);
+        const distribution = Array.from({ length: 10 }, (_, index) => {
+            const score = index + 1;
+            return {
+                score,
+                count: validRatings.filter((entry: any) => Math.round(Number(entry.rating)) === score).length,
+            };
+        });
+        const maxDistribution = Math.max(1, ...distribution.map((entry) => entry.count));
+        const genreScores = new Map<string, { name: string; count: number; total: number }>();
+
+        validRatings.forEach((entry: any) => {
+            getRatingGenreNames(entry).forEach((name) => {
+                const current = genreScores.get(name) || { name, count: 0, total: 0 };
+                current.count += 1;
+                current.total += Number(entry.rating || 0);
+                genreScores.set(name, current);
+            });
+        });
+
+        const topGenres = [...genreScores.values()]
+            .map((entry) => ({ name: entry.name, count: entry.count, average: entry.total / entry.count }))
+            .sort((a, b) => b.average - a.average || b.count - a.count || a.name.localeCompare(b.name))
+            .slice(0, 5);
+
+        return {
+            count: validRatings.length,
+            average: total / validRatings.length,
+            distribution,
+            maxDistribution,
+            topGenres,
+        };
+    }, [ratings]);
 
     if (!isLoaded) return <div className="min-h-screen bg-bg-main flex items-center justify-center text-white">Loading...</div>;
 
@@ -210,7 +360,7 @@ export default function ProfilePage() {
                             <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <Star size={48} />
                             </div>
-                            <h3 className="text-text-muted text-xs font-medium mb-1">Avg Rating</h3>
+                            <h3 className="text-text-muted text-xs font-medium mb-1">Avg TMDB</h3>
                             <p className="text-3xl font-display font-bold text-white">{stats.avgRating.toFixed(1)}</p>
                         </div>
                         <div className="bg-bg-card border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-white/10 transition-colors">
@@ -276,6 +426,83 @@ export default function ProfilePage() {
                     </div>
                 )}
 
+                {/* Ratings Dashboard */}
+                <div className="bg-bg-card border border-white/5 p-6 rounded-2xl mb-8 sm:mb-10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                        <div>
+                            <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                                <Star size={16} className="text-accent-primary" /> Ratings Dashboard
+                            </h3>
+                            <p className="text-text-muted text-xs mt-1">Personal scores only, no written reviews.</p>
+                        </div>
+                        <span className="text-xs text-text-muted rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                            {ratingStats.count} rated title{ratingStats.count === 1 ? "" : "s"}
+                        </span>
+                    </div>
+
+                    {ratingStats.count > 0 ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-[0.75fr_1.25fr_1fr] gap-5">
+                            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+                                <p className="text-text-muted text-xs font-medium mb-2">Average Personal Score</p>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-5xl font-display font-bold text-white">{ratingStats.average.toFixed(1)}</span>
+                                    <span className="text-text-muted text-sm mb-2">/10</span>
+                                </div>
+                                <p className="text-text-muted text-xs mt-3">
+                                    Based on your saved ratings across movies and shows.
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+                                <p className="text-text-muted text-xs font-medium mb-4">Rating Distribution</p>
+                                <div className="flex items-end gap-1.5 h-32">
+                                    {ratingStats.distribution.map((entry) => (
+                                        <div key={entry.score} className="flex-1 min-w-0 flex flex-col items-center gap-2">
+                                            <span className="text-[10px] text-text-muted">{entry.count || ""}</span>
+                                            <div className="w-full bg-white/5 rounded-t-md overflow-hidden flex items-end h-24">
+                                                <motion.div
+                                                    initial={{ height: 0 }}
+                                                    animate={{ height: `${(entry.count / ratingStats.maxDistribution) * 100}%` }}
+                                                    transition={{ duration: 0.7, delay: entry.score * 0.02 }}
+                                                    className="w-full bg-accent-primary/80 rounded-t-md min-h-[3px]"
+                                                />
+                                            </div>
+                                            <span className="text-[10px] text-text-muted">{entry.score}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-white/5 bg-white/[0.03] p-5">
+                                <p className="text-text-muted text-xs font-medium mb-4">Favorite Genres By Rating</p>
+                                {ratingStats.topGenres.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {ratingStats.topGenres.map((genre) => (
+                                            <div key={genre.name} className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-white text-sm font-medium truncate">{genre.name}</p>
+                                                    <p className="text-text-muted text-[11px]">{genre.count} rating{genre.count === 1 ? "" : "s"}</p>
+                                                </div>
+                                                <span className="text-accent-primary text-sm font-bold">{genre.average.toFixed(1)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-text-muted text-sm">
+                                        Rate titles from cards or detail pages to build genre scoring.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="py-10 text-center rounded-xl border border-white/5 border-dashed bg-white/[0.02]">
+                            <Star size={34} className="mx-auto text-text-muted mb-3 opacity-40" />
+                            <p className="text-text-secondary font-medium">No personal ratings yet.</p>
+                            <p className="text-text-muted text-sm mt-1">Use quick rating actions on cards to start your dashboard.</p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Favorite Genres Picker */}
                 <div className="bg-bg-card border border-white/5 p-6 rounded-2xl mb-8 sm:mb-10">
                     <h3 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
@@ -327,7 +554,7 @@ export default function ProfilePage() {
                             items.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-8 sm:gap-y-10 gap-x-3 sm:gap-x-6">
                                     {items.map((movie: any) => (
-                                        <MovieCard key={movie.id} movie={movie} />
+                                        <MovieCard key={`${movie.type || 'movie'}-${movie.id}`} movie={movie} />
                                     ))}
                                 </div>
                             ) : (
@@ -344,7 +571,7 @@ export default function ProfilePage() {
                             watched.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-8 sm:gap-y-10 gap-x-3 sm:gap-x-6">
                                     {watched.map((movie: any) => (
-                                        <MovieCard key={movie.id} movie={movie} />
+                                        <MovieCard key={`${movie.type || 'movie'}-${movie.id}`} movie={movie} />
                                     ))}
                                 </div>
                             ) : (
@@ -365,9 +592,9 @@ export default function ProfilePage() {
                                             className="flex items-center gap-4 p-4 bg-bg-card border border-white/5 rounded-xl hover:border-white/10 transition-all group"
                                         >
                                             <div className="w-12 h-16 relative rounded-lg overflow-hidden shrink-0 bg-white/5">
-                                                {item.poster_path && (
+                                                {getPosterSrc(item.poster_path) && (
                                                     <Image
-                                                        src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
+                                                        src={getPosterSrc(item.poster_path) as string}
                                                         alt={item.title || item.name || ""}
                                                         fill
                                                         sizes="48px"

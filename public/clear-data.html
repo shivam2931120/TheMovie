@@ -55,12 +55,18 @@
 
     <script>
         function displayCurrentData() {
-            const watchlist = localStorage.getItem('movie_catalogue_watchlist_v1');
-            const watched = localStorage.getItem('movie_catalogue_watched_v1');
-            
+            const parseStored = (key) => {
+                try {
+                    const raw = localStorage.getItem(key);
+                    return raw ? JSON.parse(raw) : [];
+                } catch {
+                    return "Invalid JSON";
+                }
+            };
             const data = {
-                watchlist: watchlist ? JSON.parse(watchlist) : [],
-                watched: watched ? JSON.parse(watched) : []
+                watchlist: parseStored('movie_catalogue_watchlist_v1'),
+                watched: parseStored('movie_catalogue_watched_v1'),
+                recentlyViewed: parseStored('movie_catalogue_recently_viewed_v1')
             };
             
             document.getElementById('currentData').textContent = JSON.stringify(data, null, 2);
@@ -86,6 +92,7 @@
             if (confirm('Clear ALL data? This cannot be undone!')) {
                 localStorage.removeItem('movie_catalogue_watchlist_v1');
                 localStorage.removeItem('movie_catalogue_watched_v1');
+                localStorage.removeItem('movie_catalogue_recently_viewed_v1');
                 alert('All data cleared!');
                 displayCurrentData();
             }

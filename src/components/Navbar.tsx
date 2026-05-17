@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, User, X, Home } from "lucide-react";
+import { CalendarDays, List, Search, User, X, Home } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
@@ -137,6 +137,20 @@ export function Navbar() {
                                 aria-label="Home"
                             >
                                 <Home size={20} />
+                            </Link>
+                            <Link
+                                href="/calendar"
+                                className="hidden sm:inline-flex p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                                aria-label="Release calendar"
+                            >
+                                <CalendarDays size={20} />
+                            </Link>
+                            <Link
+                                href="/lists"
+                                className="hidden sm:inline-flex p-2.5 rounded-full bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary"
+                                aria-label="Custom lists"
+                            >
+                                <List size={20} />
                             </Link>
 
                             {/* Search Bar */}

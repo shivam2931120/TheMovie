@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { X, ChevronDown, SlidersHorizontal, Bookmark, BookmarkCheck, Trash2, Folder } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { X, SlidersHorizontal, Bookmark, BookmarkCheck, Trash2, Folder } from "lucide-react";
 import { clsx } from "clsx";
-import { getMovieGenres } from "@/api/tmdb";
 
 // TMDB Genre IDs
 const MOVIE_GENRES = [
@@ -29,6 +28,25 @@ const MOVIE_GENRES = [
     { id: 37, label: "Western" },
 ];
 
+const TV_GENRES = [
+    { id: 10759, label: "Action & Adventure" },
+    { id: 16, label: "Animation" },
+    { id: 35, label: "Comedy" },
+    { id: 80, label: "Crime" },
+    { id: 99, label: "Documentary" },
+    { id: 18, label: "Drama" },
+    { id: 10751, label: "Family" },
+    { id: 10762, label: "Kids" },
+    { id: 9648, label: "Mystery" },
+    { id: 10763, label: "News" },
+    { id: 10764, label: "Reality" },
+    { id: 10765, label: "Sci-Fi & Fantasy" },
+    { id: 10766, label: "Soap" },
+    { id: 10767, label: "Talk" },
+    { id: 10768, label: "War & Politics" },
+    { id: 37, label: "Western" },
+];
+
 const SORT_OPTIONS = [
     { value: "popularity.desc", label: "Popularity ↓" },
     { value: "popularity.asc", label: "Popularity ↑" },
@@ -39,6 +57,13 @@ const SORT_OPTIONS = [
     { value: "revenue.desc", label: "Revenue ↓" },
     { value: "revenue.asc", label: "Revenue ↑" },
 ];
+
+const TV_SORT_OPTIONS = SORT_OPTIONS
+    .filter((option) => !option.value.startsWith("revenue."))
+    .map((option) => ({
+        ...option,
+        value: option.value.replace("primary_release_date", "first_air_date"),
+    }));
 
 const RUNTIME_OPTIONS = [
     { value: "", label: "Any Duration" },
@@ -97,12 +122,17 @@ export function getSavedSearches(): SavedSearch[] {
 
 function saveSavedSearches(searches: SavedSearch[]) {
     localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(searches));
+    window.dispatchEvent(new Event("themovie-saved-searches"));
 }
 
 export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
     const [isOpen, setIsOpen] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
+    const pathname = usePathname();
+    const isTVRoute = pathname?.startsWith("/tv");
+    const genreOptions = isTVRoute ? TV_GENRES : MOVIE_GENRES;
+    const sortOptions = isTVRoute ? TV_SORT_OPTIONS : SORT_OPTIONS;
 
     // Filter States
     const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
@@ -121,10 +151,10 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
     // Initialize from URL params
     useEffect(() => {
         const genres = searchParams.get("with_genres");
-        if (genres) {
-            setSelectedGenres(genres.split(",").map(Number));
-        }
-        setSortBy(searchParams.get("sort_by") || "popularity.desc");
+        const urlSortBy = searchParams.get("sort_by") || "popularity.desc";
+        const normalizedSortBy = isTVRoute ? urlSortBy.replace("primary_release_date", "first_air_date") : urlSortBy;
+        setSelectedGenres(genres ? genres.split(",").map(Number) : []);
+        setSortBy(isTVRoute && normalizedSortBy.startsWith("revenue.") ? "popularity.desc" : normalizedSortBy);
         setYearRange({
             min: parseInt(searchParams.get("year_min") || "1900"),
             max: parseInt(searchParams.get("year_max") || String(new Date().getFullYear())),
@@ -132,7 +162,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
         setRuntime(searchParams.get("runtime") || "");
         setLanguage(searchParams.get("language") || "");
         setRating(searchParams.get("certification") || "");
-    }, [searchParams]);
+    }, [isTVRoute, searchParams]);
 
     // Load saved searches from localStorage
     useEffect(() => {
@@ -241,8 +271,9 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
         if (onApply) {
             const filters: any = { sort_by: sortBy };
             if (selectedGenres.length > 0) filters.with_genres = selectedGenres.join(",");
-            if (yearRange.min !== 1900) filters["primary_release_date.gte"] = `${yearRange.min}-01-01`;
-            if (yearRange.max !== new Date().getFullYear()) filters["primary_release_date.lte"] = `${yearRange.max}-12-31`;
+            const datePrefix = isTVRoute ? "first_air_date" : "primary_release_date";
+            if (yearRange.min !== 1900) filters[`${datePrefix}.gte`] = `${yearRange.min}-01-01`;
+            if (yearRange.max !== new Date().getFullYear()) filters[`${datePrefix}.lte`] = `${yearRange.max}-12-31`;
             if (runtime) {
                 const [min, max] = runtime.split("-").map(Number);
                 filters["with_runtime.gte"] = min;
@@ -321,7 +352,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                         Genres (Select Multiple)
                                     </label>
                                     <div className="flex flex-wrap gap-2">
-                                        {MOVIE_GENRES.map(genre => (
+                                        {genreOptions.map(genre => (
                                             <button
                                                 key={genre.id}
                                                 onClick={() => toggleGenre(genre.id)}
@@ -348,7 +379,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                         onChange={(e) => setSortBy(e.target.value)}
                                         className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent-primary"
                                     >
-                                        {SORT_OPTIONS.map(opt => (
+                                        {sortOptions.map(opt => (
                                             <option key={opt.value} value={opt.value} className="bg-black">
                                                 {opt.label}
                                             </option>
@@ -510,7 +541,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                                         <span className="font-medium">{s.name}</span>
                                                         <span className="text-xs text-text-muted ml-2">
                                                             {s.genres.length > 0
-                                                                ? s.genres.map(gid => MOVIE_GENRES.find(g => g.id === gid)?.label).filter(Boolean).slice(0, 2).join(", ")
+                                                                ? s.genres.map(gid => genreOptions.find(g => g.id === gid)?.label).filter(Boolean).slice(0, 2).join(", ")
                                                                 : "All Genres"}
                                                             {s.genres.length > 2 && ` +${s.genres.length - 2}`}
                                                         </span>

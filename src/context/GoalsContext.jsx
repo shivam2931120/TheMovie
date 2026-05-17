@@ -1,5 +1,8 @@
+"use client";
+
 import { createContext, useContext, useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
 
 const GoalsContext = createContext();
 
@@ -42,12 +45,7 @@ export function GoalsProvider({ children }) {
 
         try {
             if (isSignedIn && user) {
-                await user.update({
-                    unsafeMetadata: {
-                        ...user.unsafeMetadata,
-                        watchGoals: mergedGoals,
-                    },
-                });
+                await saveUnsafeMetadata(user, { watchGoals: mergedGoals });
             } else {
                 localStorage.setItem("watchGoals", JSON.stringify(mergedGoals));
             }

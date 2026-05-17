@@ -1,5 +1,8 @@
+"use client";
+
 import { createContext, useContext, useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
 
 const SocialContext = createContext();
 
@@ -40,12 +43,7 @@ export function SocialProvider({ children }) {
     const saveSocialData = async (data) => {
         try {
             if (isSignedIn && user) {
-                await user.update({
-                    unsafeMetadata: {
-                        ...user.unsafeMetadata,
-                        social: data,
-                    },
-                });
+                await saveUnsafeMetadata(user, { social: data });
             } else {
                 localStorage.setItem("socialData", JSON.stringify(data));
             }

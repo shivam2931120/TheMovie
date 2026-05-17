@@ -6,10 +6,6 @@ import { getMovieDetails, getMovieRecommendations } from '@/api/tmdb';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 
-interface AIRecommendationsProps {
-    movieId: number;
-}
-
 export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: 'movie' | 'tv' }) {
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -119,7 +115,7 @@ export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: '
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {recommendations.map((item, index) => (
                     <motion.div
-                        key={item.id}
+                        key={`${type}-${item.id}`}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}

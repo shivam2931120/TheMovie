@@ -2,10 +2,13 @@
 
 import { useEffect, useState, useContext } from 'react';
 import { MovieRow } from './MovieRow';
-import { getMovieDetails, getDiscoverMovies, getMovieRecommendations } from '@/api/tmdb';
+import { getMovieDetails, getDiscoverMovies, getMovieRecommendations, getTVRecommendations } from '@/api/tmdb';
 import { RecentlyViewedContext } from '@/context/RecentlyViewedContext';
 import { WatchlistContext } from '@/context/watchlist-context';
 import { WatchedContext } from '@/context/WatchedContext';
+import { useLists } from '@/context/ListsContext';
+import { useRatings } from '@/context/ReviewContext';
+import { useUser } from '@clerk/nextjs';
 
 // GENRE_MAP for profile favourite-genre → TMDB genre ID
 const GENRE_ID_MAP: Record<string, number> = {
@@ -21,11 +24,15 @@ export function PersonalizedRows() {
     const [genreRowTitle, setGenreRowTitle] = useState("");
     const [becauseYouWatchedRow, setBecauseYouWatchedRow] = useState<any[]>([]);
     const [becauseTitle, setBecauseTitle] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [becauseYouRatedRow, setBecauseYouRatedRow] = useState<any[]>([]);
+    const [becauseRatedTitle, setBecauseRatedTitle] = useState("");
 
     const { recentlyViewed } = useContext(RecentlyViewedContext) as any;
     const { items: watchlistItems } = useContext(WatchlistContext) as any;
     const { watched } = useContext(WatchedContext) as any;
+    const { ratings } = useRatings() as any;
+    const { lists } = useLists() as any;
+    const { user, isSignedIn } = useUser();
 
     useEffect(() => {
         let isMounted = true;
@@ -42,11 +49,21 @@ export function PersonalizedRows() {
                 .slice(0, 5)
                 .map((item: any) => item.id) || [];
 
-            const signalIds = [...new Set([...recentIds, ...watchlistIds])];
+            const ratedMovieIds = ratings
+                ?.filter((rating: any) => rating.type === 'movie' && rating.rating >= 7)
+                .slice(0, 5)
+                .map((rating: any) => rating.itemId) || [];
+
+            const listedMovieIds = lists
+                ?.flatMap((list: any) => list.movies || [])
+                .filter((item: any) => item.type === 'movie')
+                .slice(0, 5)
+                .map((item: any) => item.id) || [];
+
+            const signalIds = [...new Set([...recentIds, ...watchlistIds, ...ratedMovieIds, ...listedMovieIds])];
 
             if (signalIds.length > 0) {
                 try {
-                    setLoading(true);
                     const res = await fetch(`/api/ai-recommend?movieIds=${signalIds.join(',')}`);
                     const data = await res.json();
                     const recIds = data.recommendations || [];
@@ -59,8 +76,6 @@ export function PersonalizedRows() {
                     }
                 } catch (err) {
                     // Silently fail — not critical
-                } finally {
-                    if (isMounted) setLoading(false);
                 }
             }
 
@@ -81,11 +96,39 @@ export function PersonalizedRows() {
                 }
             }
 
-            // 3. Genre-based row from saved favorite genres
+            // 3. Rating-driven recommendations
+            const topRating = (ratings || [])
+                .filter((rating: any) => rating.rating >= 7 && rating.itemId)
+                .sort((a: any, b: any) => b.rating - a.rating)[0];
+
+            if (topRating) {
+                try {
+                    const recs = topRating.type === 'tv'
+                        ? await getTVRecommendations(topRating.itemId)
+                        : await getMovieRecommendations(topRating.itemId);
+                    if (recs?.results && isMounted) {
+                        const title = topRating.item?.title || topRating.movieTitle || "a title";
+                        setBecauseYouRatedRow(
+                            recs.results
+                                .filter((item: any) => item.poster_path)
+                                .slice(0, 15)
+                                .map((item: any) => ({ ...item, type: topRating.type || 'movie' }))
+                        );
+                        setBecauseRatedTitle(`Because You Rated "${title}" ${topRating.rating}/10`);
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            // 4. Genre-based row from saved favorite genres
             try {
-                const savedGenres = typeof window !== 'undefined'
-                    ? JSON.parse(localStorage.getItem("user_favorite_genres") || "[]")
-                    : [];
+                const metadataPreferences = user?.unsafeMetadata?.profilePreferences as { favoriteGenres?: string[] } | undefined;
+                const savedGenres = isSignedIn && Array.isArray(metadataPreferences?.favoriteGenres)
+                    ? metadataPreferences.favoriteGenres
+                    : typeof window !== 'undefined'
+                        ? JSON.parse(localStorage.getItem("user_favorite_genres") || "[]")
+                        : [];
                 if (savedGenres.length > 0) {
                     // Pick a random favorite genre
                     const pick = savedGenres[Math.floor(Math.random() * savedGenres.length)];
@@ -109,9 +152,9 @@ export function PersonalizedRows() {
 
         fetchPersonalized();
         return () => { isMounted = false; };
-    }, [recentlyViewed, watchlistItems, watched]);
+    }, [recentlyViewed, watchlistItems, watched, ratings, lists, user, isSignedIn]);
 
-    if (aiRecommendations.length === 0 && genreRow.length === 0 && becauseYouWatchedRow.length === 0) return null;
+    if (aiRecommendations.length === 0 && genreRow.length === 0 && becauseYouWatchedRow.length === 0 && becauseYouRatedRow.length === 0) return null;
 
     return (
         <>
@@ -120,6 +163,9 @@ export function PersonalizedRows() {
             )}
             {becauseYouWatchedRow.length > 0 && (
                 <MovieRow title={becauseTitle} movies={becauseYouWatchedRow} />
+            )}
+            {becauseYouRatedRow.length > 0 && (
+                <MovieRow title={becauseRatedTitle} movies={becauseYouRatedRow} />
             )}
             {genreRow.length > 0 && (
                 <MovieRow title={genreRowTitle} movies={genreRow} />

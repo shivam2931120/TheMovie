@@ -4,16 +4,17 @@ import axios from "axios";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
-// Cached API Key
-let cachedTmdbKey = null;
+const EMPTY_RESPONSE = { results: [], total_pages: 0, total_results: 0 };
 
 // Helper to get API key (Priority: NEXT_PUBLIC, VITE, Process Env)
 const getApiKey = () => {
     if (typeof process !== 'undefined' && process.env) {
-        return process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
+        const key = process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
+        if (!key || key === "your_tmdb_api_key_here") return null;
+        return key.trim();
     }
     return null;
-}
+};
 
 // Create Axios Instance
 const api = axios.create({
@@ -37,19 +38,19 @@ api.interceptors.request.use((config) => {
 const fetchFromApi = async (endpoint, params = {}) => {
     try {
         const apiKey = getApiKey();
-        if (!apiKey || apiKey === 'your_tmdb_api_key_here') {
-            // Proceed without key (might fail for some endpoints) or log warning
-            console.warn(`[TMDB] Missing or placeholder API Key. Requests may fail.`);
+        if (!apiKey) {
+            console.warn("[TMDB] Missing API key. Returning an empty response.");
+            return { ...EMPTY_RESPONSE };
         }
         const { data } = await api.get(endpoint, { params });
-        return data || { results: [], total_pages: 0, total_results: 0 };
+        return data || { ...EMPTY_RESPONSE };
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
             console.error(`[TMDB] Timeout fetching ${endpoint}`);
         } else {
             console.error(`[TMDB] Error fetching ${endpoint}:`, error.message);
         }
-        return { results: [], total_pages: 0, total_results: 0 }; // Return empty structure instead of null
+        return { ...EMPTY_RESPONSE }; // Return empty structure instead of null
     }
 };
 
@@ -71,28 +72,47 @@ export const getTopRatedMovies = (page = 1) =>
     fetchFromApi("/movie/top_rated", { page });
 
 export const getMovieDetails = (id) =>
-    fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,release_dates" });
+    fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,release_dates" });
 
 export const searchMovies = (query, page = 1) =>
     fetchFromApi("/search/movie", { query, page });
 
+export const searchTV = (query, page = 1) =>
+    fetchFromApi("/search/tv", { query, page });
+
 export const searchMulti = (query, page = 1) =>
     fetchFromApi("/search/multi", { query, page });
+
+export const searchPeople = (query, page = 1) =>
+    fetchFromApi("/search/person", { query, page });
 
 export const getMovieGenres = () =>
     fetchFromApi("/genre/movie/list");
 
-export const getDiscoverMovies = (filters = {}, page = 1) =>
-    fetchFromApi("/discover/movie", { ...filters, page });
+export const getDiscoverMovies = (filters = {}, page = 1) => {
+    const { page: filterPage, ...rest } = filters;
+    return fetchFromApi("/discover/movie", { ...rest, page: filterPage ?? page });
+};
 
-export const getDiscoverTV = (filters = {}, page = 1) =>
-    fetchFromApi("/discover/tv", { ...filters, page });
+export const getDiscoverTV = (filters = {}, page = 1) => {
+    const { page: filterPage, ...rest } = filters;
+    return fetchFromApi("/discover/tv", { ...rest, page: filterPage ?? page });
+};
 
 export const getTVDetails = (id) =>
-    fetchFromApi(`/tv/${id}`, { append_to_response: "videos,credits,similar,images,reviews,keywords,alternative_titles,content_ratings,aggregate_credits,external_ids" });
+    fetchFromApi(`/tv/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,content_ratings,aggregate_credits,external_ids" });
 
 export const getWatchProviders = (id, type = 'movie') =>
     fetchFromApi(`/${type}/${id}/watch/providers`);
+
+export const getMovieWatchProviderList = (watchRegion = "US") =>
+    fetchFromApi("/watch/providers/movie", { watch_region: watchRegion });
+
+export const getTVWatchProviderList = (watchRegion = "US") =>
+    fetchFromApi("/watch/providers/tv", { watch_region: watchRegion });
+
+export const getWatchProviderRegions = () =>
+    fetchFromApi("/watch/providers/regions");
 
 export const getTVGenres = () =>
     fetchFromApi("/genre/tv/list");
@@ -177,6 +197,3 @@ export const getBackdropUrl = (path) => getImageUrl(path, "original");
 
 // Helper to get poster URL
 export const getPosterUrl = (path, size = "w500") => getImageUrl(path, size);
-
-
-

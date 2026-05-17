@@ -5,11 +5,6 @@ import Link from "next/link";
 import { Plus, Film, List } from "lucide-react";
 
 const FRANCHISES = [
-    { id: 86311, title: "Marvel Cinematic Universe", image: "/marvel_collection.jpg", backdrop: "/mcu_backdrop.jpg" }, // Need to use IDs that work or generic images if we don't have them
-    // Actually, let's use real TMDb Collection IDs and fetch their images? 
-    // Or simpler: Hardcode some known backdrops from major movies in these collections for visual impact.
-    // Specifying IDs for reference: Avengers Collection (86311), Star Wars (10), Harry Potter (1241), James Bond (645)
-    // I will use a high quality poster path for them.
     { id: 86311, name: "The Avengers Collection", poster: "/yF1eOkaYvwiORauRCPWznV9xVvi.jpg" },
     { id: 10, name: "Star Wars Collection", poster: "/r8Ph5MYXL04Qzu4LfdIiogozKOQ.jpg" },
     { id: 1241, name: "Harry Potter Collection", poster: "/evtCkkF3t4aw3u3e4k8s6aX3z5.jpg" },
@@ -56,18 +51,18 @@ export default function CollectionsPage() {
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <List className="text-accent-primary" size={24} /> Your Lists
                     </h2>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-accent-primary rounded-lg text-sm font-bold text-white hover:bg-accent-primary/90 transition-colors">
+                    <Link href="/lists" className="flex items-center gap-2 px-4 py-2 bg-accent-primary rounded-lg text-sm font-bold text-white hover:bg-accent-primary/90 transition-colors">
                         <Plus size={16} /> Create List
-                    </button>
+                    </Link>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="border border-white/10 bg-bg-card rounded-xl p-6 flex flex-col items-center justify-center text-center h-48 border-dashed hover:border-accent-primary/50 hover:bg-white/5 transition-all cursor-pointer group">
+                    <Link href="/lists" className="border border-white/10 bg-bg-card rounded-xl p-6 flex flex-col items-center justify-center text-center h-48 border-dashed hover:border-accent-primary/50 hover:bg-white/5 transition-all cursor-pointer group">
                         <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center text-text-muted group-hover:text-accent-primary group-hover:bg-accent-primary/20 transition-all mb-4">
                             <Plus size={24} />
                         </div>
                         <p className="text-text-secondary font-medium">Create New List</p>
-                    </div>
+                    </Link>
                 </div>
             </div>
         </main>

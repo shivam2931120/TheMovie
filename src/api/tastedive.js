@@ -6,7 +6,7 @@ let cachedTasteDiveKey = null;
 
 async function getTasteDiveApiKey() {
   if (cachedTasteDiveKey) return cachedTasteDiveKey;
-  const envKey = process.env.NEXT_PUBLIC_TASTEDIVE_API_KEY;
+  const envKey = process.env.NEXT_PUBLIC_TASTEDIVE_API_KEY || process.env.VITE_TASTEDIVE_API_KEY;
   if (envKey && typeof envKey === "string" && envKey.trim()) {
     cachedTasteDiveKey = envKey.trim();
     return cachedTasteDiveKey;

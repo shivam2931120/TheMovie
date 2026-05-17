@@ -4,9 +4,12 @@ import { useEffect, useState, useContext } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
-import { Play, Plus, Star, Calendar, Clock, X, Check, DollarSign, Award, MapPin, Music, Film, ChevronLeft, ChevronRight, MessageSquare, Tag, User, List as ListIcon, Trash2 } from "lucide-react";
+import { Play, Plus, Star, Calendar, Clock, X, Check, DollarSign, Award, MapPin, Film, Tag, List as ListIcon } from "lucide-react";
 import { getMovieDetails, getWatchProviders, getCollection } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
+import { ReminderButton } from "@/components/ReminderButton";
+import { UserRatingPanel } from "@/components/UserRatingPanel";
+import { WatchProviders } from "@/components/WatchProviders";
 import YouTube from "react-youtube";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
@@ -48,6 +51,9 @@ export default function MovieDetailsPage() {
             if (id) {
                 try {
                     const data = await getMovieDetails(id as string);
+                    if (!data?.id) {
+                        throw new Error("Movie details are unavailable. Check the TMDB API key and try again.");
+                    }
                     const providers = await getWatchProviders(id as string, 'movie');
 
                     // Get providers for selected region
@@ -65,6 +71,8 @@ export default function MovieDetailsPage() {
                             console.warn('Could not load collection:', err);
                             setCollection(null);
                         }
+                    } else {
+                        setCollection(null);
                     }
 
                     // Add to recently viewed
@@ -101,17 +109,20 @@ export default function MovieDetailsPage() {
     };
 
     const handleListToggle = (listId: string) => {
-        if (isInList(listId, movie.id)) {
-            removeFromList(listId, movie.id);
+        if (isInList(listId, movie.id, 'movie')) {
+            removeFromList(listId, movie.id, 'movie');
         } else {
-            addToList(listId, movie);
+            addToList(listId, { ...movie, type: 'movie' });
         }
     };
 
     const handleCreateList = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newListName.trim()) return;
-        await createList(newListName.trim());
+        const list = await createList(newListName.trim());
+        if (list?.id && movie) {
+            await addToList(list.id, { ...movie, type: 'movie' });
+        }
         setNewListName("");
     };
 
@@ -141,10 +152,9 @@ export default function MovieDetailsPage() {
     const behindScenes = movie.videos?.results.filter((v: any) => (v.type === "Behind the Scenes" || v.type === "Featurette") && v.site === "YouTube") || [];
 
     const trailer = trailers[0] || clips[0];
-    const crew = movie.credits?.crew.slice(0, 5);
+    const activeVideo = selectedVideo || trailer;
     const cast = movie.credits?.cast || [];
-    const reviews = movie.reviews?.results || [];
-    const similar = movie.similar?.results.slice(0, 10);
+    const similar = movie.similar?.results?.slice(0, 10) || [];
     const keywords = movie.keywords?.keywords || [];
     const alternativeTitles = movie.alternative_titles?.titles || [];
     const availableRegions = movie.allProviders ? Object.keys(movie.allProviders).sort() : ['IN', 'US', 'GB', 'CA', 'AU'];
@@ -155,18 +165,18 @@ export default function MovieDetailsPage() {
                 {/* Cinematic Background */}
                 <div className="relative h-[80vh] w-full overflow-hidden">
                     {/* Video Player Overlay */}
-                    {showTrailer && trailer ? (
+                    {showTrailer && activeVideo ? (
                         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-                            <div className="absolute inset-0 bg-black/90" onClick={() => setShowTrailer(false)} />
+                            <div className="absolute inset-0 bg-black/90" onClick={() => { setShowTrailer(false); setSelectedVideo(null); }} />
                             <button
-                                onClick={() => setShowTrailer(false)}
+                                onClick={() => { setShowTrailer(false); setSelectedVideo(null); }}
                                 className="absolute top-8 right-8 text-white hover:text-red-500 z-50 p-2 bg-black/50 rounded-full"
                             >
                                 <X size={32} />
                             </button>
                             <div className="relative w-full max-w-6xl aspect-video z-50 p-4">
                                 <YouTube
-                                    videoId={trailer.key}
+                                    videoId={activeVideo.key}
                                     opts={{
                                         width: '100%',
                                         height: '100%',
@@ -178,13 +188,17 @@ export default function MovieDetailsPage() {
                         </div>
                     ) : (
                         <>
-                            <Image
-                                src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
-                                alt={movie.title}
-                                fill
-                                className="object-cover"
-                                priority
-                            />
+                            {movie.backdrop_path ? (
+                                <Image
+                                    src={`https://image.tmdb.org/t/p/original${movie.backdrop_path}`}
+                                    alt={movie.title}
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                />
+                            ) : (
+                                <div className="absolute inset-0 bg-gradient-to-br from-bg-elevated to-bg-main" />
+                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-bg-main via-bg-main/60 to-transparent" />
                             <div className="absolute inset-0 bg-gradient-to-r from-bg-main via-bg-main/40 to-transparent" />
                         </>
@@ -196,12 +210,18 @@ export default function MovieDetailsPage() {
                         {/* Poster */}
                         <div className="w-full max-w-[280px] sm:max-w-[300px] shrink-0 mx-auto lg:mx-0">
                             <div className="aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group">
-                                <Image
-                                    src={`https://image.tmdb.org/t/p/w780${movie.poster_path}`}
-                                    alt={movie.title}
-                                    fill
-                                    className="object-cover"
-                                />
+                                {movie.poster_path ? (
+                                    <Image
+                                        src={`https://image.tmdb.org/t/p/w780${movie.poster_path}`}
+                                        alt={movie.title}
+                                        fill
+                                        className="object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-white/5 flex items-center justify-center text-text-muted">
+                                        No poster
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -249,7 +269,7 @@ export default function MovieDetailsPage() {
                                 <div className="flex flex-wrap items-center gap-3 lg:gap-4 relative">
                                     {trailer && (
                                         <button
-                                            onClick={() => setShowTrailer(true)}
+                                            onClick={() => { setSelectedVideo(trailer); setShowTrailer(true); }}
                                             className="flex items-center gap-2 px-6 lg:px-8 py-3 lg:py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(229,9,20,0.4)] text-sm lg:text-base"
                                         >
                                             <Play fill="currentColor" size={20} />
@@ -298,7 +318,7 @@ export default function MovieDetailsPage() {
 
                                                         <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
                                                             {lists.map((list: any) => {
-                                                                const inList = isInList(list.id, movie.id);
+                                                                const inList = isInList(list.id, movie.id, 'movie');
                                                                 return (
                                                                     <button
                                                                         key={list.id}
@@ -330,6 +350,15 @@ export default function MovieDetailsPage() {
                                         </div>
                                     </SignedIn>
 
+                                    {movie.release_date && (
+                                        <ReminderButton
+                                            item={{ ...movie, type: 'movie' }}
+                                            date={movie.release_date}
+                                            note="Movie release"
+                                            className="py-3 lg:py-4 rounded-xl"
+                                        />
+                                    )}
+
                                     <SignedOut>
                                         <button
                                             onClick={() => openSignIn()}
@@ -342,55 +371,14 @@ export default function MovieDetailsPage() {
                             </div>
 
                             {/* Streaming Providers */}
-                            <div className="mb-0">
-                                {movie.providers && (movie.providers.flatrate || movie.providers.buy) ? (
-                                    <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="text-lg font-bold text-white">Where to Watch</h3>
-                                            <select
-                                                value={selectedRegion}
-                                                onChange={(e) => setSelectedRegion(e.target.value)}
-                                                className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-accent-primary"
-                                            >
-                                                {availableRegions.map((region) => (
-                                                    <option key={region} value={region} className="bg-bg-card">
-                                                        {region}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="flex flex-wrap gap-4">
-                                            {movie.providers.flatrate?.map((provider: any) => (
-                                                <div key={provider.provider_id} className="relative group" title={`Stream on ${provider.provider_name}`}>
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10">
-                                                        <Image
-                                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                            alt={provider.provider_name}
-                                                            width={48}
-                                                            height={48}
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {movie.providers.buy?.map((provider: any) => (
-                                                <div key={provider.provider_id} className="relative group" title={`Buy on ${provider.provider_name}`}>
-                                                    <div className="w-12 h-12 rounded-lg overflow-hidden border border-white/10 opacity-80 hover:opacity-100 transition-opacity">
-                                                        <Image
-                                                            src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                                                            alt={provider.provider_name}
-                                                            width={48}
-                                                            height={48}
-                                                            className="object-cover"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p className="text-xs text-text-muted mt-2">Data via JustWatch</p>
-                                    </div>
-                                ) : null}
-                            </div>
+                            <WatchProviders
+                                providers={movie.providers}
+                                availableRegions={availableRegions}
+                                selectedRegion={selectedRegion}
+                                onRegionChange={setSelectedRegion}
+                            />
+
+                            <UserRatingPanel item={{ ...movie, type: 'movie' }} type="movie" />
 
                             {/* Overview */}
                             <div>
@@ -715,7 +703,7 @@ export default function MovieDetailsPage() {
                         </div>
                     )}
 
-                    {/* Reviews & More */}
+                    {/* Recommendations & More */}
                     <div className="mt-20 space-y-12">
                         {/* AI Recommendations */}
                         <AIRecommendations id={movie.id} type="movie" />
@@ -731,26 +719,6 @@ export default function MovieDetailsPage() {
                                 </div>
                             </div>
                         )}
-
-                        {/* Reviews */}
-                        <div className="border-t border-white/5 pt-12">
-                            <h3 className="text-2xl font-display font-bold text-white mb-6">Reviews</h3>
-                            {reviews && reviews.length > 0 ? (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    {reviews.map((review: any) => (
-                                        <div key={review.id} className="bg-bg-card p-6 rounded-xl border border-white/5">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h4 className="font-bold text-white">{review.author}</h4>
-                                                <span className="text-xs text-text-muted">{new Date(review.created_at).toLocaleDateString()}</span>
-                                            </div>
-                                            <p className="text-text-secondary line-clamp-6 leading-relaxed">{review.content}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-text-secondary italic">No reviews yet.</p>
-                            )}
-                        </div>
 
                         {/* Trivia & Fun Facts */}
                         <div className="border-t border-white/5 pt-12">
@@ -797,25 +765,6 @@ export default function MovieDetailsPage() {
                 </div>
             </main>
 
-            {/* Trailer Modal */}
-            {showTrailer && selectedVideo && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setShowTrailer(false)}>
-                    <div className="relative w-full max-w-6xl aspect-video" onClick={(e) => e.stopPropagation()}>
-                        <button
-                            onClick={() => setShowTrailer(false)}
-                            className="absolute -top-12 right-0 text-white hover:text-accent-primary transition-colors"
-                        >
-                            <X size={32} />
-                        </button>
-                        <iframe
-                            src={`https://www.youtube.com/embed/${selectedVideo.key}?autoplay=1`}
-                            className="w-full h-full rounded-xl"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                        />
-                    </div>
-                </div>
-            )}
         </>
     );
 }

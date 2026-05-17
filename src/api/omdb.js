@@ -6,7 +6,7 @@ let cachedOmdbKey = null;
 
 async function getOmdbApiKey() {
   if (cachedOmdbKey) return cachedOmdbKey;
-  const envKey = process.env.NEXT_PUBLIC_OMDB_API_KEY;
+  const envKey = process.env.NEXT_PUBLIC_OMDB_API_KEY || process.env.VITE_OMDB_API_KEY;
   if (envKey && typeof envKey === "string" && envKey.trim()) {
     cachedOmdbKey = envKey.trim();
     return cachedOmdbKey;

@@ -9,7 +9,6 @@ import { Filters } from "@/components/Filters";
 import { AdvancedFilters } from "@/components/AdvancedFilters";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useInView } from "react-intersection-observer";
-import clsx from "clsx";
 import { motion } from "framer-motion";
 
 function MoviesContent() {
@@ -27,7 +26,8 @@ function MoviesContent() {
         async function loadMovies() {
             setLoading(true);
             setMovies([]);
-            setCurrentPage(1);
+            const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+            setCurrentPage(page);
             const genre = searchParams.get("with_genres");
             const sortBy = searchParams.get("sort_by") || "popularity.desc";
             const yearMin = searchParams.get("year_min");
@@ -36,7 +36,7 @@ function MoviesContent() {
             const language = searchParams.get("language");
             const certification = searchParams.get("certification");
             
-            const filters: any = { sort_by: sortBy, page: 1 };
+            const filters: any = { sort_by: sortBy, page };
             if (genre) filters.with_genres = genre;
             if (yearMin) filters["primary_release_date.gte"] = `${yearMin}-01-01`;
             if (yearMax) filters["primary_release_date.lte"] = `${yearMax}-12-31`;

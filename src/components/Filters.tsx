@@ -2,10 +2,10 @@
 
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 // TMDB Genre IDs
-const genres = [
+const MOVIE_GENRES = [
     { id: "all", label: "All", value: "" },
     { id: "action", label: "Action", value: "28" },
     { id: "adventure", label: "Adventure", value: "12" },
@@ -18,18 +18,35 @@ const genres = [
     { id: "animation", label: "Animation", value: "16" },
 ];
 
+const TV_GENRES = [
+    { id: "all", label: "All", value: "" },
+    { id: "action-adventure", label: "Action", value: "10759" },
+    { id: "animation", label: "Animation", value: "16" },
+    { id: "comedy", label: "Comedy", value: "35" },
+    { id: "crime", label: "Crime", value: "80" },
+    { id: "documentary", label: "Documentary", value: "99" },
+    { id: "drama", label: "Drama", value: "18" },
+    { id: "family", label: "Family", value: "10751" },
+    { id: "kids", label: "Kids", value: "10762" },
+    { id: "mystery", label: "Mystery", value: "9648" },
+    { id: "reality", label: "Reality", value: "10764" },
+    { id: "scifi-fantasy", label: "Sci-Fi", value: "10765" },
+];
+
 export function Filters() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const currentGenre = searchParams.get("genre") || "all";
+    const pathname = usePathname();
+    const genres = pathname?.startsWith("/tv") ? TV_GENRES : MOVIE_GENRES;
 
-    const handleFilterClick = (genreId: string, genreValue: string) => {
+    const handleFilterClick = (_genreId: string, genreValue: string) => {
         const params = new URLSearchParams(searchParams.toString());
         if (genreValue) {
-            params.set("genre", genreValue);
+            params.set("with_genres", genreValue);
         } else {
-            params.delete("genre");
+            params.delete("with_genres");
         }
+        params.delete("genre");
         // Reset page to 1 on filter change
         params.set("page", "1");
 
@@ -38,8 +55,9 @@ export function Filters() {
 
     // Helper to check active state
     const isActive = (g: any) => {
-        if (g.id === "all" && !searchParams.get("genre")) return true;
-        return searchParams.get("genre") === g.value;
+        const selectedGenre = searchParams.get("with_genres") || searchParams.get("genre");
+        if (g.id === "all" && !selectedGenre) return true;
+        return selectedGenre === g.value;
     };
 
     return (

@@ -1,16 +1,16 @@
 import * as tmdb from "./tmdb";
-import { searchMovies as omdbSearch, getMovieDetails as omdbDetails, getGenres as omdbGenres } from "./omdb";
+import { searchMovies as omdbSearch, getMovieDetails as omdbDetails } from "./omdb";
 import { getSimilarTvShows } from "./tastedive";
 
 // Check if an API key is available
 
 const hasTmdbKey = () => {
-  const key = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  const key = process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.VITE_TMDB_API_KEY;
   return key && typeof key === "string" && key.trim().length > 0;
 };
 
 const hasOmdbKey = () => {
-  const key = process.env.NEXT_PUBLIC_OMDB_API_KEY;
+  const key = process.env.NEXT_PUBLIC_OMDB_API_KEY || process.env.VITE_OMDB_API_KEY;
   return key && typeof key === "string" && key.trim().length > 0;
 };
 
@@ -88,12 +88,12 @@ export const enhancedMovieSearch = async (query, page = 1) => {
 export const enhancedDiscover = async ({ page = 1, genreId, year, rating, sortBy } = {}) => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.discoverMovies({
+      return await tmdb.getDiscoverMovies({
         page,
-        genreId,
-        year,
-        minRating: rating,
-        sortBy: sortBy || "popularity.desc",
+        ...(genreId ? { with_genres: genreId } : {}),
+        ...(year ? { primary_release_year: year } : {}),
+        ...(rating ? { "vote_average.gte": rating } : {}),
+        sort_by: sortBy || "popularity.desc",
       });
     }
   } catch (error) {
@@ -177,7 +177,9 @@ export const enhancedMovieDetails = async (movieId) => {
         try {
           const omdbData = await omdbDetails(tmdbData.imdb_id);
           return { ...tmdbData, ...omdbData };
-        } catch { }
+        } catch {
+          // Keep TMDB details when optional OMDB enrichment is unavailable.
+        }
       }
       return tmdbData;
     }
@@ -196,7 +198,11 @@ export const enhancedMovieDetails = async (movieId) => {
 export const getTrailerKey = async (movieId) => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.getTrailerKey(movieId);
+      const videos = await tmdb.getMovieVideos(movieId);
+      const trailer = videos?.results?.find(
+        (video) => video.site === "YouTube" && video.type === "Trailer"
+      ) || videos?.results?.find((video) => video.site === "YouTube");
+      return trailer?.key || null;
     }
   } catch (error) {
     console.warn("Failed to get trailer:", error);
@@ -208,7 +214,8 @@ export const getTrailerKey = async (movieId) => {
 export const enhancedGenres = async () => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.getGenres();
+      const data = await tmdb.getMovieGenres();
+      return data?.genres || [];
     }
   } catch (error) {
     console.warn("TMDB genres failed:", error);
@@ -233,16 +240,31 @@ export const enhancedGenres = async () => {
 
 // Era Browsing
 export const discoverByEra = async (era, page = 1) => {
+  const eraRanges = {
+    "80s": ["1980-01-01", "1989-12-31"],
+    "90s": ["1990-01-01", "1999-12-31"],
+    "2000s": ["2000-01-01", "2009-12-31"],
+    "2010s": ["2010-01-01", "2019-12-31"],
+    "2020s": ["2020-01-01", "2029-12-31"],
+  };
+
   try {
     if (hasTmdbKey()) {
-      return await tmdb.discoverByEra(era, page);
+      const [start, end] = eraRanges[era] || [];
+      return await tmdb.getDiscoverMovies({
+        page,
+        sort_by: "vote_average.desc",
+        "vote_count.gte": 500,
+        ...(start ? { "primary_release_date.gte": start } : {}),
+        ...(end ? { "primary_release_date.lte": end } : {}),
+      });
     }
   } catch (error) {
     console.warn("TMDB era browse failed:", error);
   }
 
   // Filter demo by era
-  const eraRanges = {
+  const demoEraRanges = {
     "80s": ["1980", "1981", "1982", "1983", "1984", "1985", "1986", "1987", "1988", "1989"],
     "90s": ["1990", "1991", "1992", "1993", "1994", "1995", "1996", "1997", "1998", "1999"],
     "2000s": ["2000", "2001", "2002", "2003", "2004", "2005", "2006", "2007", "2008", "2009"],
@@ -250,7 +272,7 @@ export const discoverByEra = async (era, page = 1) => {
     "2020s": ["2020", "2021", "2022", "2023", "2024", "2025"],
   };
 
-  const years = eraRanges[era] || [];
+  const years = demoEraRanges[era] || [];
   const movies = DEMO_MOVIES.filter(m => years.some(y => m.release_date?.startsWith(y)));
 
   return {
@@ -265,7 +287,12 @@ export const discoverByEra = async (era, page = 1) => {
 export const getAwardWinners = async (category = "oscar", page = 1) => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.getAwardWinners(category, page);
+      return await tmdb.getDiscoverMovies({
+        page,
+        sort_by: "vote_average.desc",
+        "vote_count.gte": category === "oscar" ? 2000 : 1000,
+        "vote_average.gte": 8,
+      });
     }
   } catch (error) {
     console.warn("TMDB award winners failed:", error);
@@ -280,7 +307,10 @@ export const getAwardWinners = async (category = "oscar", page = 1) => {
 export const getRandomMovie = async (filters = {}) => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.getRandomMovie(filters);
+      const randomPage = Math.floor(Math.random() * 20) + 1;
+      const data = await tmdb.getDiscoverMovies({ ...filters, page: randomPage });
+      const results = data?.results || [];
+      return results[Math.floor(Math.random() * results.length)] || null;
     }
   } catch (error) {
     console.warn("Random movie failed:", error);
@@ -314,13 +344,20 @@ export const getCollection = async (collectionId) => {
 };
 
 // Popular Collections
-export const getPopularCollections = () => tmdb.POPULAR_COLLECTIONS;
+export const getPopularCollections = () => [
+  { id: 86311, name: "The Avengers Collection" },
+  { id: 10, name: "Star Wars Collection" },
+  { id: 1241, name: "Harry Potter Collection" },
+  { id: 263, name: "The Dark Knight Collection" },
+  { id: 9485, name: "The Fast and the Furious Collection" },
+  { id: 87359, name: "Mission: Impossible Collection" },
+];
 
 // Similar Movies
 export const enhancedSimilarMovies = async (movieId, page = 1) => {
   try {
     if (hasTmdbKey()) {
-      return await tmdb.getSimilarMovies(movieId, page);
+      return await tmdb.getMovieRecommendations(movieId, page);
     }
   } catch (error) {
     console.warn("TMDB similar failed:", error);

@@ -2,12 +2,17 @@
 
 import { Suspense } from "react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { getDiscoverMovies } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useInView } from "react-intersection-observer";
 import { motion } from "framer-motion";
+
+const TOP_RATED_FILTERS = {
+    sort_by: "vote_average.desc",
+    "vote_count.gte": 500,
+    "vote_average.gte": 7,
+};
 
 function TopRatedContent() {
     const [movies, setMovies] = useState<any[]>([]);
@@ -15,22 +20,12 @@ function TopRatedContent() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const router = useRouter();
     const { ref: loadMoreRef, inView } = useInView({ threshold: 0.5 });
-
-    // Hardcoded filters for "Highest Rated"
-    // Sort by vote_average descending
-    // Filter by vote_count >= 500 to avoid 1-vote wonders
-    const FILTERS = {
-        sort_by: "vote_average.desc",
-        "vote_count.gte": 500,
-        "vote_average.gte": 7, // Optional: only show good movies
-    };
 
     useEffect(() => {
         async function loadMovies() {
             setLoading(true);
-            const data = await getDiscoverMovies({ ...FILTERS, page: 1 });
+            const data = await getDiscoverMovies({ ...TOP_RATED_FILTERS, page: 1 });
             if (data?.results) {
                 setMovies(data.results);
                 setTotalPages(Math.min(data.total_pages || 1, 500));
@@ -47,7 +42,7 @@ function TopRatedContent() {
         async function loadMore() {
             setLoadingMore(true);
             const nextPage = currentPage + 1;
-            const data = await getDiscoverMovies({ ...FILTERS, page: nextPage });
+            const data = await getDiscoverMovies({ ...TOP_RATED_FILTERS, page: nextPage });
             if (data?.results) {
                 setMovies(prev => [...prev, ...data.results]);
                 setCurrentPage(nextPage);

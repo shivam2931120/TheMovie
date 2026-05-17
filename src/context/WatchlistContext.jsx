@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { WatchlistContext } from "./watchlist-context";
+import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { clearStoredKeys, hasGuestMergeChanges, mergeTypedItems, readStoredJson } from "@/lib/guestDataMerge";
 
 const STORAGE_KEY = "movie_catalogue_watchlist_v1";
+
+const normalizeWatchlistItem = (item) => {
+  if (item.type) return item;
+  const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
+  return { ...item, type: isTv ? 'tv' : 'movie' };
+};
 
 export function WatchlistProvider({ children }) {
   const { user, isSignedIn, isLoaded } = useUser();
@@ -14,24 +22,30 @@ export function WatchlistProvider({ children }) {
 
   useEffect(() => {
     if (!isLoaded) return;
+    initialized.current = false;
 
     if (isSignedIn && user) {
       const userWatchlist = user.unsafeMetadata?.watchlist || [];
-      const migratedItems = userWatchlist.map(item => {
-        if (item.type) return item;
-        const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
-        return { ...item, type: isTv ? 'tv' : 'movie' };
-      });
-      setItems(migratedItems);
+      const accountItems = userWatchlist.map(normalizeWatchlistItem);
+      const guestItems = readStoredJson(STORAGE_KEY, []).map(normalizeWatchlistItem);
+      const mergedItems = mergeTypedItems(accountItems, guestItems);
+      setItems(mergedItems);
+
+      if ((guestItems.length > 0 && hasGuestMergeChanges(accountItems, mergedItems)) || hasGuestMergeChanges(userWatchlist, accountItems)) {
+        saveUnsafeMetadata(user, { watchlist: mergedItems }).then(() => {
+          clearStoredKeys([STORAGE_KEY]);
+        }).catch(() => {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(guestItems));
+          } catch { /* ignore */ }
+        });
+      } else if (guestItems.length > 0) {
+        clearStoredKeys([STORAGE_KEY]);
+      }
     } else {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const storedItems = raw ? JSON.parse(raw) : [];
-        const migratedItems = storedItems.map(item => {
-          if (item.type) return item;
-          const isTv = (item.name && !item.title) || item.image?.medium || item.premiered;
-          return { ...item, type: isTv ? 'tv' : 'movie' };
-        });
+        const storedItems = readStoredJson(STORAGE_KEY, []);
+        const migratedItems = storedItems.map(normalizeWatchlistItem);
         setItems(migratedItems);
       } catch {
         setItems([]);
@@ -46,12 +60,7 @@ export function WatchlistProvider({ children }) {
 
     saveTimeout.current = setTimeout(() => {
       if (isSignedIn && user) {
-        user.update({
-          unsafeMetadata: {
-            ...user.unsafeMetadata,
-            watchlist: items
-          }
-        }).catch(() => {
+        saveUnsafeMetadata(user, { watchlist: items }).catch(() => {
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
           } catch { /* ignore */ }

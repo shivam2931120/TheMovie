@@ -28,7 +28,7 @@ export const queryKeys = {
         discover: (filters: any) => ["movies", "discover", filters],
         details: (id: string | number) => ["movies", "details", id],
         similar: (id: string | number, page: number) => ["movies", "similar", id, page],
-        reviews: (id: string | number, page: number) => ["movies", "reviews", id, page],
+        ratings: (id: string | number) => ["user", "ratings", id],
         trailer: (id: string | number) => ["movies", "trailer", id],
     },
     collections: {

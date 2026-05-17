@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
-import { PlayCircle, Plus, Info, Check, Eye, EyeOff } from "lucide-react";
+import { PlayCircle, Plus, Check, Eye, EyeOff, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useContext } from "react";
@@ -9,22 +9,28 @@ import clsx from "clsx";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
 import { useUser, useClerk } from "@clerk/nextjs";
+import { useRatings } from "@/context/ReviewContext";
 
 interface Movie {
     id: number;
     title?: string;
     name?: string; // For TV
-    poster_path: string;
-    vote_average: number;
+    poster_path?: string | null;
+    vote_average?: number | null;
     release_date?: string;
     first_air_date?: string; // For TV
     overview?: string;
+    type?: "movie" | "tv";
+    genre_ids?: number[];
+    genres?: Array<{ id: number; name: string }>;
 }
 
 interface MovieCardProps {
     movie: Movie;
     className?: string;
 }
+
+const QUICK_RATING_SCORES = [2, 4, 6, 8, 10];
 
 export function MovieCard({ movie, className }: MovieCardProps) {
     const { isSignedIn } = useUser();
@@ -42,12 +48,20 @@ export function MovieCard({ movie, className }: MovieCardProps) {
     // Contexts
     const { has, add, remove } = useContext(WatchlistContext) as any;
     const { hasWatched, addWatched, removeWatched } = useContext(WatchedContext) as any;
+    const { getRatingForItem, upsertRating, deleteRatingForItem } = useRatings() as any;
 
     // Determine type based on props (crude but effective for combined card)
-    const type = movie.name ? 'tv' : 'movie';
+    const type = movie.type || (movie.name ? 'tv' : 'movie');
+    const posterSrc = movie.poster_path
+        ? movie.poster_path.startsWith("http")
+            ? movie.poster_path
+            : `https://image.tmdb.org/t/p/w500${movie.poster_path}`
+        : null;
 
     const isWatchlisted = has(movie.id, type);
-    const isWatched = hasWatched(movie.id);
+    const isWatched = hasWatched(movie.id, type);
+    const personalRating = getRatingForItem(movie.id, type);
+    const personalScore = Number(personalRating?.rating || 0);
 
     const handleWatchlist = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -75,19 +89,38 @@ export function MovieCard({ movie, className }: MovieCardProps) {
         }
 
         if (isWatched) {
-            removeWatched(movie.id);
+            removeWatched(movie.id, type);
         } else {
             addWatched({ ...movie, type });
         }
     };
 
+    const handleQuickRating = async (e: React.MouseEvent, score: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (personalScore === score) {
+            await deleteRatingForItem(movie.id, type);
+            return;
+        }
+
+        await upsertRating({ ...movie, type }, score);
+    };
+
     const title = movie.title || movie.name;
     const date = movie.release_date || movie.first_air_date;
-    const year = date ? new Date(date).getFullYear() : "N/A";
+    const year = date ? date.split("-")[0] : "N/A";
+    const rating = typeof movie.vote_average === "number" ? movie.vote_average : null;
 
-    const handleDragEnd = (event: any, info: PanInfo) => {
+    const handleDragEnd = (_event: any, info: PanInfo) => {
         const offset = info.offset.x;
         const velocity = info.velocity.x;
+
+        if (!isSignedIn && (Math.abs(offset) > 50 || Math.abs(velocity) > 500)) {
+            openSignIn();
+            x.set(0);
+            return;
+        }
 
         // Swipe right (> 50px or fast swipe) - Add to watchlist
         if (offset > 50 || velocity > 500) {
@@ -140,9 +173,9 @@ export function MovieCard({ movie, className }: MovieCardProps) {
             )}
             {/* Poster */}
             <div className="relative aspect-[2/3] w-full bg-bg-card">
-                {movie.poster_path ? (
+                {posterSrc ? (
                     <Image
-                        src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                        src={posterSrc}
                         alt={title || "Movie"}
                         fill
                         className={clsx(
@@ -203,6 +236,26 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                             {isWatched ? <Eye size={12} /> : <EyeOff size={12} />}
                         </button>
                     </div>
+
+                    <div className="relative z-10 flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-1.5 backdrop-blur-md">
+                        {QUICK_RATING_SCORES.map((score) => (
+                            <button
+                                key={score}
+                                type="button"
+                                onClick={(event) => handleQuickRating(event, score)}
+                                className={clsx(
+                                    "h-6 w-6 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-white",
+                                    score <= personalScore
+                                        ? "text-accent-primary"
+                                        : "text-white/55 hover:text-white"
+                                )}
+                                aria-label={personalScore === score ? `Remove ${score} out of 10 rating` : `Rate ${score} out of 10`}
+                                title={personalScore === score ? "Remove rating" : `Rate ${score}/10`}
+                            >
+                                <Star size={13} fill={score <= personalScore ? "currentColor" : "none"} />
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -212,9 +265,11 @@ export function MovieCard({ movie, className }: MovieCardProps) {
                     {title}
                 </h3>
                 <div className="flex items-center gap-2 mt-1">
-                    <span className="text-accent-primary text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-accent-primary/10 border border-accent-primary/20">
-                        {(movie.vote_average * 10).toFixed(0)}% Match
-                    </span>
+                    {rating !== null && (
+                        <span className="text-accent-primary text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-accent-primary/10 border border-accent-primary/20">
+                            {(rating * 10).toFixed(0)}% Match
+                        </span>
+                    )}
                     <span className="text-text-muted text-[10px] sm:text-xs">
                         {year}
                     </span>
