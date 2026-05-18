@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useContext } from 'react';
 import { MovieRow } from './MovieRow';
-import { getMovieDetails, getDiscoverMovies, getMovieRecommendations, getTVRecommendations } from '@/api/tmdb';
+import { getDiscoverMovies, getMovieRecommendations, getMovieSummaries, getTVRecommendations } from '@/api/tmdb';
 import { RecentlyViewedContext } from '@/context/RecentlyViewedContext';
 import { WatchlistContext } from '@/context/watchlist-context';
 import { WatchedContext } from '@/context/WatchedContext';
@@ -18,6 +18,33 @@ const GENRE_ID_MAP: Record<string, number> = {
     "TV Movie": 10770, "Thriller": 53, "War": 10752, "Western": 37,
 };
 
+const MAX_SIGNAL_IDS = 20;
+const MAX_ROW_ITEMS = 15;
+const SEARCH_SIGNAL_STORAGE_KEY = "themovie_recent_search_signals";
+
+const toMovieId = (value: unknown) => {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+const uniqueMovieIds = (ids: Array<number | null>, limit = MAX_SIGNAL_IDS) => {
+    const unique: number[] = [];
+    const seen = new Set<number>();
+
+    for (const id of ids) {
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        unique.push(id);
+        if (unique.length >= limit) break;
+    }
+
+    return unique;
+};
+
+const isMovieItem = (item: any) => item?.type === 'movie' || (!item?.type && !item?.name);
+const hasCardData = (item: any) => item?.id && item?.poster_path && (item.title || item.name);
+const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
+
 export function PersonalizedRows() {
     const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
     const [genreRow, setGenreRow] = useState<any[]>([]);
@@ -26,6 +53,7 @@ export function PersonalizedRows() {
     const [becauseTitle, setBecauseTitle] = useState("");
     const [becauseYouRatedRow, setBecauseYouRatedRow] = useState<any[]>([]);
     const [becauseRatedTitle, setBecauseRatedTitle] = useState("");
+    const [searchSignals, setSearchSignals] = useState<any[]>([]);
 
     const { recentlyViewed } = useContext(RecentlyViewedContext) as any;
     const { items: watchlistItems } = useContext(WatchlistContext) as any;
@@ -35,124 +63,221 @@ export function PersonalizedRows() {
     const { user, isSignedIn } = useUser();
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const loadSearchSignals = () => {
+            try {
+                const stored = JSON.parse(localStorage.getItem(SEARCH_SIGNAL_STORAGE_KEY) || "[]");
+                setSearchSignals(Array.isArray(stored) ? stored : []);
+            } catch {
+                setSearchSignals([]);
+            }
+        };
+
+        loadSearchSignals();
+        window.addEventListener("themovie-search-signals", loadSearchSignals);
+        window.addEventListener("storage", loadSearchSignals);
+
+        return () => {
+            window.removeEventListener("themovie-search-signals", loadSearchSignals);
+            window.removeEventListener("storage", loadSearchSignals);
+        };
+    }, []);
+
+    useEffect(() => {
         let isMounted = true;
+        const controller = new AbortController();
 
-        async function fetchPersonalized() {
-            // 1. AI-based recommendations from watch/watchlist signals
-            const recentIds = recentlyViewed
-                ?.filter((item: any) => item.type === 'movie')
+        const recentItems = Array.isArray(recentlyViewed) ? recentlyViewed : [];
+        const watchlist = Array.isArray(watchlistItems) ? watchlistItems : [];
+        const watchedItems = Array.isArray(watched) ? watched : [];
+        const ratingItems = Array.isArray(ratings) ? ratings : [];
+        const customLists = Array.isArray(lists) ? lists : [];
+        const recentSearchSignals = Array.isArray(searchSignals) ? searchSignals : [];
+
+        setAiRecommendations([]);
+        setGenreRow([]);
+        setGenreRowTitle("");
+        setBecauseYouWatchedRow([]);
+        setBecauseTitle("");
+        setBecauseYouRatedRow([]);
+        setBecauseRatedTitle("");
+
+        const buildSignalIds = () => {
+            const recentIds = recentItems
+                .filter(isMovieItem)
                 .slice(0, 5)
-                .map((item: any) => item.id) || [];
+                .map((item: any) => toMovieId(item.id));
 
-            const watchlistIds = watchlistItems
-                ?.filter((item: any) => item.type === 'movie')
+            const watchlistIds = watchlist
+                .filter(isMovieItem)
                 .slice(0, 5)
-                .map((item: any) => item.id) || [];
+                .map((item: any) => toMovieId(item.id));
 
-            const ratedMovieIds = ratings
-                ?.filter((rating: any) => rating.type === 'movie' && rating.rating >= 7)
+            const ratedMovieIds = ratingItems
+                .filter((rating: any) => rating.type === 'movie' && rating.rating >= 7)
                 .slice(0, 5)
-                .map((rating: any) => rating.itemId) || [];
+                .map((rating: any) => toMovieId(rating.itemId));
 
-            const listedMovieIds = lists
-                ?.flatMap((list: any) => list.movies || [])
-                .filter((item: any) => item.type === 'movie')
+            const listedMovieIds = customLists
+                .flatMap((list: any) => Array.isArray(list.movies) ? list.movies : [])
+                .filter(isMovieItem)
                 .slice(0, 5)
-                .map((item: any) => item.id) || [];
+                .map((item: any) => toMovieId(item.id));
 
-            const signalIds = [...new Set([...recentIds, ...watchlistIds, ...ratedMovieIds, ...listedMovieIds])];
+            const searchMovieIds = recentSearchSignals
+                .flatMap((signal: any) => Array.isArray(signal.movieIds) ? signal.movieIds : [])
+                .slice(0, 5)
+                .map((id: any) => toMovieId(id));
 
-            if (signalIds.length > 0) {
-                try {
-                    const res = await fetch(`/api/ai-recommend?movieIds=${signalIds.join(',')}`);
-                    const data = await res.json();
-                    const recIds = data.recommendations || [];
+            return uniqueMovieIds([...recentIds, ...searchMovieIds, ...watchlistIds, ...ratedMovieIds, ...listedMovieIds]);
+        };
 
-                    if (recIds.length > 0) {
-                        const topIds = recIds.slice(0, 15);
-                        const moviePromises = topIds.map((id: number) => getMovieDetails(id).catch(() => null));
-                        const movies = await Promise.all(moviePromises);
-                        if (isMounted) setAiRecommendations(movies.filter(m => m && m.id));
-                    }
-                } catch (err) {
-                    // Silently fail — not critical
-                }
-            }
+        const loadAiRecommendations = async () => {
+            const signalIds = buildSignalIds();
+            const latestSearchQuery = recentSearchSignals.find((signal: any) => typeof signal?.query === "string" && signal.query.trim())?.query || "";
+            if (signalIds.length === 0 && !latestSearchQuery) return [];
 
-            // 2. "Because You Watched X" row — pick most recent watched movie and get similar
-            const recentWatched = (watched || [])
-                .filter((m: any) => m.id && (m.type !== 'tv'))
-                .slice(0, 3);
-            if (recentWatched.length > 0) {
-                const seed = recentWatched[Math.floor(Math.random() * recentWatched.length)];
-                try {
-                    const recs = await getMovieRecommendations(seed.id);
-                    if (recs?.results && isMounted) {
-                        setBecauseYouWatchedRow(recs.results.filter((m: any) => m.poster_path).slice(0, 15));
-                        setBecauseTitle(`Because You Watched "${seed.title || seed.name}"`);
-                    }
-                } catch {
-                    // ignore
-                }
-            }
+            const signalSet = new Set(signalIds);
+            const params = new URLSearchParams();
+            if (signalIds.length > 0) params.set("movieIds", signalIds.join(','));
+            if (latestSearchQuery) params.set("query", latestSearchQuery);
+            const res = await fetch(`/api/ai-recommend?${params.toString()}`, {
+                signal: controller.signal,
+            });
 
-            // 3. Rating-driven recommendations
-            const topRating = (ratings || [])
-                .filter((rating: any) => rating.rating >= 7 && rating.itemId)
+            if (!res.ok) return [];
+
+            const data = await res.json();
+            const recIds = uniqueMovieIds(
+                (Array.isArray(data.recommendations) ? data.recommendations : [])
+                    .map((id: number | string) => toMovieId(id)),
+                MAX_ROW_ITEMS
+            ).filter((id) => !signalSet.has(id));
+
+            if (recIds.length === 0) return [];
+
+            const movies = await getMovieSummaries(recIds, MAX_ROW_ITEMS);
+            return movies
+                .filter(hasCardData)
+                .map((movie: any) => ({ ...movie, type: 'movie' }));
+        };
+
+        const loadBecauseYouWatched = async () => {
+            const seed = watchedItems.find((item: any) => toMovieId(item.id) && isMovieItem(item));
+            if (!seed) return { title: "", movies: [] };
+
+            const recs = await getMovieRecommendations(seed.id);
+            const movies = Array.isArray(recs?.results)
+                ? recs.results
+                    .filter(hasCardData)
+                    .slice(0, MAX_ROW_ITEMS)
+                    .map((movie: any) => ({ ...movie, type: 'movie' }))
+                : [];
+
+            return {
+                title: movies.length > 0 ? `Because You Watched "${seed.title || seed.name}"` : "",
+                movies,
+            };
+        };
+
+        const loadBecauseYouRated = async () => {
+            const topRating = [...ratingItems]
+                .filter((rating: any) => rating.rating >= 7 && toMovieId(rating.itemId))
                 .sort((a: any, b: any) => b.rating - a.rating)[0];
 
-            if (topRating) {
+            if (!topRating) return { title: "", movies: [] };
+
+            const type = topRating.type === 'tv' ? 'tv' : 'movie';
+            const recs = type === 'tv'
+                ? await getTVRecommendations(topRating.itemId)
+                : await getMovieRecommendations(topRating.itemId);
+
+            const movies = Array.isArray(recs?.results)
+                ? recs.results
+                    .filter(hasCardData)
+                    .slice(0, MAX_ROW_ITEMS)
+                    .map((item: any) => ({ ...item, type }))
+                : [];
+
+            const title = topRating.item?.title || topRating.item?.name || topRating.movieTitle || "a title";
+
+            return {
+                title: movies.length > 0 ? `Because You Rated "${title}" ${topRating.rating}/10` : "",
+                movies,
+            };
+        };
+
+        const loadGenreRow = async () => {
+            const metadataPreferences = user?.unsafeMetadata?.profilePreferences as { favoriteGenres?: string[] } | undefined;
+            let savedGenres: string[] = [];
+
+            if (isSignedIn && Array.isArray(metadataPreferences?.favoriteGenres)) {
+                savedGenres = metadataPreferences.favoriteGenres;
+            } else if (typeof window !== 'undefined') {
                 try {
-                    const recs = topRating.type === 'tv'
-                        ? await getTVRecommendations(topRating.itemId)
-                        : await getMovieRecommendations(topRating.itemId);
-                    if (recs?.results && isMounted) {
-                        const title = topRating.item?.title || topRating.movieTitle || "a title";
-                        setBecauseYouRatedRow(
-                            recs.results
-                                .filter((item: any) => item.poster_path)
-                                .slice(0, 15)
-                                .map((item: any) => ({ ...item, type: topRating.type || 'movie' }))
-                        );
-                        setBecauseRatedTitle(`Because You Rated "${title}" ${topRating.rating}/10`);
-                    }
+                    const parsed = JSON.parse(localStorage.getItem("user_favorite_genres") || "[]");
+                    savedGenres = Array.isArray(parsed) ? parsed : [];
                 } catch {
-                    // ignore
+                    savedGenres = [];
                 }
             }
 
-            // 4. Genre-based row from saved favorite genres
-            try {
-                const metadataPreferences = user?.unsafeMetadata?.profilePreferences as { favoriteGenres?: string[] } | undefined;
-                const savedGenres = isSignedIn && Array.isArray(metadataPreferences?.favoriteGenres)
-                    ? metadataPreferences.favoriteGenres
-                    : typeof window !== 'undefined'
-                        ? JSON.parse(localStorage.getItem("user_favorite_genres") || "[]")
-                        : [];
-                if (savedGenres.length > 0) {
-                    // Pick a random favorite genre
-                    const pick = savedGenres[Math.floor(Math.random() * savedGenres.length)];
-                    const genreId = GENRE_ID_MAP[pick];
-                    if (genreId) {
-                        const data = await getDiscoverMovies({
-                            with_genres: genreId.toString(),
-                            sort_by: "popularity.desc",
-                            "vote_count.gte": 100,
-                        });
-                        if (data?.results && isMounted) {
-                            setGenreRow(data.results.filter((m: any) => m.poster_path).slice(0, 15));
-                            setGenreRowTitle(`Top ${pick} Movies For You`);
-                        }
+            const pick = savedGenres.find((genre) => typeof genre === "string" && GENRE_ID_MAP[genre]);
+            const genreId = pick ? GENRE_ID_MAP[pick] : null;
+
+            if (!pick || !genreId) return { title: "", movies: [] };
+
+            const data = await getDiscoverMovies({
+                with_genres: genreId.toString(),
+                sort_by: "popularity.desc",
+                "vote_count.gte": 100,
+            });
+
+            const movies = Array.isArray(data?.results)
+                ? data.results
+                    .filter(hasCardData)
+                    .slice(0, MAX_ROW_ITEMS)
+                    .map((movie: any) => ({ ...movie, type: 'movie' }))
+                : [];
+
+            return {
+                title: movies.length > 0 ? `Top ${pick} Movies For You` : "",
+                movies,
+            };
+        };
+
+        const runTask = (loader: () => Promise<any>, apply: (result: any) => void) => {
+            void loader()
+                .then((result) => {
+                    if (isMounted) apply(result);
+                })
+                .catch((error) => {
+                    if (!isAbortError(error)) {
+                        console.warn("Personalized recommendation row failed:", error);
                     }
-                }
-            } catch {
-                // ignore
-            }
-        }
+                });
+        };
 
-        fetchPersonalized();
-        return () => { isMounted = false; };
-    }, [recentlyViewed, watchlistItems, watched, ratings, lists, user, isSignedIn]);
+        runTask(loadAiRecommendations, setAiRecommendations);
+        runTask(loadBecauseYouWatched, (row) => {
+            setBecauseYouWatchedRow(row.movies);
+            setBecauseTitle(row.title);
+        });
+        runTask(loadBecauseYouRated, (row) => {
+            setBecauseYouRatedRow(row.movies);
+            setBecauseRatedTitle(row.title);
+        });
+        runTask(loadGenreRow, (row) => {
+            setGenreRow(row.movies);
+            setGenreRowTitle(row.title);
+        });
+
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
+    }, [recentlyViewed, watchlistItems, watched, ratings, lists, searchSignals, user, isSignedIn]);
 
     if (aiRecommendations.length === 0 && genreRow.length === 0 && becauseYouWatchedRow.length === 0 && becauseYouRatedRow.length === 0) return null;
 

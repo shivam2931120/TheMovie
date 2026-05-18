@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { MovieCard } from './MovieCard';
-import { getMovieDetails, getMovieRecommendations } from '@/api/tmdb';
+import { getMovieRecommendations, getMovieSummaries, getTVRecommendations } from '@/api/tmdb';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
+
+const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
+const hasCardData = (item: any) => item?.id && item?.poster_path && (item.title || item.name);
 
 export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: 'movie' | 'tv' }) {
     const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -13,6 +16,7 @@ export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: '
 
     useEffect(() => {
         let isMounted = true;
+        const controller = new AbortController();
 
         async function fetchRecommendations() {
             try {
@@ -23,41 +27,43 @@ export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: '
                 // 1. Try Custom AI Model (Movies Only)
                 if (type === 'movie') {
                     try {
-                        const res = await fetch(`/api/ai-recommend?movieId=${id}`);
+                        const params = new URLSearchParams({ movieId: String(id) });
+                        const res = await fetch(`/api/ai-recommend?${params.toString()}`, {
+                            signal: controller.signal,
+                        });
                         if (res.ok) {
                             const data = await res.json();
-                            const recIds = data.recommendations || [];
+                            const recIds = Array.isArray(data.recommendations) ? data.recommendations : [];
 
                             if (recIds.length > 0) {
-                                const topIds = recIds.slice(0, 6);
-                                const promises = topIds.map((mid: number) => getMovieDetails(mid).catch(() => null));
-                                const results = await Promise.all(promises);
-                                items = results.filter(m => m && m.id && m.poster_path);
+                                const topIds = recIds
+                                    .map((mid: number | string) => Number(mid))
+                                    .filter((mid: number) => Number.isInteger(mid) && mid > 0 && mid !== id)
+                                    .slice(0, 6);
+                                const results = await getMovieSummaries(topIds, 6);
+                                items = results
+                                    .filter(hasCardData)
+                                    .map((movie: any) => ({ ...movie, type: 'movie' }));
                             }
                         }
                     } catch (e) {
-                        console.warn("AI fetch failed", e);
+                        if (!isAbortError(e)) console.warn("AI fetch failed", e);
                     }
                 }
 
                 // 2. Fallback / TV Handling
                 if (items.length === 0) {
-                    setIsFallback(true);
+                    if (isMounted) setIsFallback(true);
                     try {
-                        let tmdbRecs;
-                        if (type === 'movie') {
-                            tmdbRecs = await getMovieRecommendations(id);
-                        } else {
-                            // Using dynamic import or assuming getTVRecommendations is available
-                            const { getTVRecommendations } = await import('@/api/tmdb');
-                            tmdbRecs = await getTVRecommendations(id);
-                        }
+                        const tmdbRecs = type === 'movie'
+                            ? await getMovieRecommendations(id)
+                            : await getTVRecommendations(id);
 
                         if (tmdbRecs && tmdbRecs.results) {
-                            // Filter valid items (ensure poster and name/title)
                             items = tmdbRecs.results
-                                .filter((m: any) => m.poster_path && (m.title || m.name))
-                                .slice(0, 6);
+                                .filter(hasCardData)
+                                .slice(0, 6)
+                                .map((item: any) => ({ ...item, type }));
                         }
                     } catch (tmdbErr) {
                         console.warn("TMDB Fallback failed:", tmdbErr);
@@ -68,7 +74,7 @@ export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: '
                     setRecommendations(items);
                 }
             } catch (err) {
-                console.error("Failed to load recommendations", err);
+                if (!isAbortError(err)) console.error("Failed to load recommendations", err);
             } finally {
                 if (isMounted) setLoading(false);
             }
@@ -78,7 +84,10 @@ export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: '
             fetchRecommendations();
         }
 
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
     }, [id, type]);
 
     if (loading) return (

@@ -2,11 +2,12 @@
 
 import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { Loader2, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import {
     getDiscoverMovies,
     getDiscoverTV,
     getMovieGenres,
+    getMovieSummaries,
     getMovieWatchProviderList,
     getTVGenres,
     getTVWatchProviderList,
@@ -19,6 +20,19 @@ import { MovieCard } from "@/components/MovieCard";
 
 type ContentType = "all" | "movie" | "tv";
 type PersonRole = "cast" | "director";
+type SearchResult = {
+    id: number;
+    title?: string;
+    name?: string;
+    poster_path?: string | null;
+    backdrop_path?: string | null;
+    media_type?: "movie" | "tv";
+    type: "movie" | "tv";
+};
+
+const MAX_RECOMMENDATION_SEEDS = 8;
+const MAX_SEARCH_RECOMMENDATIONS = 10;
+const SEARCH_SIGNAL_STORAGE_KEY = "themovie_recent_search_signals";
 
 const LANGUAGES = [
     { code: "", label: "Any language" },
@@ -41,6 +55,50 @@ function normalizeResult(item: any, type: "movie" | "tv") {
     };
 }
 
+function isAbortError(error: unknown) {
+    return error instanceof DOMException && error.name === "AbortError";
+}
+
+function getMovieResultIds(results: SearchResult[]) {
+    const ids: number[] = [];
+    const seen = new Set<number>();
+
+    for (const item of results) {
+        if (item.type !== "movie" || !Number.isInteger(Number(item.id))) continue;
+        const id = Number(item.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        ids.push(id);
+        if (ids.length >= MAX_RECOMMENDATION_SEEDS) break;
+    }
+
+    return ids;
+}
+
+function storeSearchSignal(query: string, results: SearchResult[]) {
+    if (typeof window === "undefined") return;
+
+    const movieIds = getMovieResultIds(results);
+    if (movieIds.length === 0 && !query.trim()) return;
+
+    try {
+        const existing = JSON.parse(localStorage.getItem(SEARCH_SIGNAL_STORAGE_KEY) || "[]");
+        const nextSignal = {
+            query: query.trim(),
+            movieIds,
+            searchedAt: new Date().toISOString(),
+        };
+        const next = [
+            nextSignal,
+            ...(Array.isArray(existing) ? existing : []).filter((item: any) => item?.query !== nextSignal.query),
+        ].slice(0, 10);
+        localStorage.setItem(SEARCH_SIGNAL_STORAGE_KEY, JSON.stringify(next));
+        window.dispatchEvent(new Event("themovie-search-signals"));
+    } catch {
+        // Search history is an optional personalization signal.
+    }
+}
+
 function SearchContent() {
     const searchParams = useSearchParams();
     const queryParam = searchParams.get("q") || "";
@@ -59,6 +117,8 @@ function SearchContent() {
     const [tvGenres, setTvGenres] = useState<any[]>([]);
     const [providers, setProviders] = useState<any[]>([]);
     const [results, setResults] = useState<any[]>([]);
+    const [searchRecommendations, setSearchRecommendations] = useState<any[]>([]);
+    const [recommendationsLoading, setRecommendationsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(Boolean(queryParam));
     const [error, setError] = useState("");
@@ -120,10 +180,75 @@ function SearchContent() {
 
     const hasAdvancedFilters = Boolean(person.trim() || genre || year || language || minRating || runtimeMax || provider);
 
+    const loadSearchRecommendations = useCallback(async (
+        searchQuery: string,
+        sourceResults: SearchResult[],
+        signal?: AbortSignal
+    ) => {
+        const trimmedQuery = searchQuery.trim();
+        const movieIds = getMovieResultIds(sourceResults);
+
+        if (!trimmedQuery && movieIds.length === 0) {
+            setSearchRecommendations([]);
+            setRecommendationsLoading(false);
+            return;
+        }
+
+        setRecommendationsLoading(true);
+
+        try {
+            const params = new URLSearchParams();
+            if (trimmedQuery) params.set("query", trimmedQuery);
+            if (movieIds.length > 0) params.set("resultIds", movieIds.join(","));
+
+            const response = await fetch(`/api/ai-recommend?${params.toString()}`, { signal });
+            if (signal?.aborted) return;
+            if (!response.ok) {
+                setSearchRecommendations([]);
+                return;
+            }
+
+            const data = await response.json();
+            if (signal?.aborted) return;
+            const recIds: number[] = Array.isArray(data.recommendations)
+                ? data.recommendations
+                    .map((id: number | string) => Number(id))
+                    .filter((id: number) => Number.isInteger(id) && id > 0)
+                : [];
+
+            const visibleMovieIds = new Set(movieIds);
+            const uniqueRecIds = [...new Set(recIds)]
+                .filter((id) => !visibleMovieIds.has(id))
+                .slice(0, MAX_SEARCH_RECOMMENDATIONS);
+
+            if (uniqueRecIds.length === 0) {
+                setSearchRecommendations([]);
+                return;
+            }
+
+            const movies = await getMovieSummaries(uniqueRecIds, MAX_SEARCH_RECOMMENDATIONS);
+            if (signal?.aborted) return;
+            setSearchRecommendations(
+                movies
+                    .filter((movie: any) => movie?.id && movie?.poster_path && movie?.title)
+                    .map((movie: any) => ({ ...movie, type: "movie" }))
+            );
+        } catch (recommendationError) {
+            if (!isAbortError(recommendationError)) {
+                console.warn("Search recommendations failed:", recommendationError);
+                setSearchRecommendations([]);
+            }
+        } finally {
+            if (!signal?.aborted) setRecommendationsLoading(false);
+        }
+    }, []);
+
     const runSearch = useCallback(async (searchQuery = query) => {
         const trimmedQuery = searchQuery.trim();
         if (!trimmedQuery && !hasAdvancedFilters) {
             setResults([]);
+            setSearchRecommendations([]);
+            setRecommendationsLoading(false);
             setSearched(false);
             return;
         }
@@ -139,6 +264,8 @@ function SearchContent() {
                 personId = personData?.results?.[0]?.id || null;
                 if (!personId) {
                     setResults([]);
+                    setSearchRecommendations([]);
+                    setRecommendationsLoading(false);
                     setError("No matching person was found.");
                     return;
                 }
@@ -195,20 +322,31 @@ function SearchContent() {
                 nextResults = nextResults.filter((item) => (item.title || item.name || "").toLowerCase().includes(lowerQuery));
             }
 
-            const deduped = [...new Map(nextResults.map((item) => [`${item.type}-${item.id}`, item])).values()];
-            setResults(deduped.filter((item) => item.poster_path || item.backdrop_path));
+            const deduped = [...new Map(nextResults.map((item) => [`${item.type}-${item.id}`, item])).values()] as SearchResult[];
+            const visibleResults = deduped.filter((item) => item.poster_path || item.backdrop_path);
+            setResults(visibleResults);
+            storeSearchSignal(trimmedQuery, visibleResults);
+            if (contentType === "tv") {
+                setSearchRecommendations([]);
+                setRecommendationsLoading(false);
+            } else {
+                void loadSearchRecommendations(trimmedQuery, visibleResults);
+            }
         } catch (searchError) {
             console.error("Advanced search failed:", searchError);
             setError("Search failed. Please try again.");
             setResults([]);
+            setSearchRecommendations([]);
+            setRecommendationsLoading(false);
         } finally {
             setLoading(false);
         }
-    }, [contentType, genre, hasAdvancedFilters, language, minRating, person, personRole, provider, query, region, runtimeMax, year]);
+    }, [contentType, genre, hasAdvancedFilters, language, loadSearchRecommendations, minRating, person, personRole, provider, query, region, runtimeMax, year]);
 
     useEffect(() => {
         if (!queryParam) return;
         let isMounted = true;
+        const controller = new AbortController();
 
         async function loadInitialQuery() {
             setLoading(true);
@@ -220,13 +358,18 @@ function SearchContent() {
                     .filter((item: any) => item.media_type === "movie" || item.media_type === "tv")
                     .map((item: any) => normalizeResult(item, item.media_type));
                 if (isMounted) {
-                    setResults(items.filter((item: any) => item.poster_path || item.backdrop_path));
+                    const visibleResults = items.filter((item: any) => item.poster_path || item.backdrop_path);
+                    setResults(visibleResults);
+                    storeSearchSignal(queryParam, visibleResults);
+                    void loadSearchRecommendations(queryParam, visibleResults, controller.signal);
                 }
             } catch (initialError) {
-                console.error("Initial search failed:", initialError);
+                if (!isAbortError(initialError)) console.error("Initial search failed:", initialError);
                 if (isMounted) {
                     setError("Search failed. Please try again.");
                     setResults([]);
+                    setSearchRecommendations([]);
+                    setRecommendationsLoading(false);
                 }
             } finally {
                 if (isMounted) setLoading(false);
@@ -234,8 +377,11 @@ function SearchContent() {
         }
 
         loadInitialQuery();
-        return () => { isMounted = false; };
-    }, [queryParam]);
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
+    }, [loadSearchRecommendations, queryParam]);
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -418,6 +564,8 @@ function SearchContent() {
                                 setRuntimeMax("");
                                 setProvider("");
                                 setResults([]);
+                                setSearchRecommendations([]);
+                                setRecommendationsLoading(false);
                                 setSearched(false);
                                 setError("");
                             }}
@@ -427,6 +575,31 @@ function SearchContent() {
                         </button>
                     </div>
                 </form>
+
+                {(recommendationsLoading || searchRecommendations.length > 0) && (
+                    <section className="mb-10">
+                        <div className="mb-5 flex items-center gap-2">
+                            <div className="rounded-lg bg-accent-primary/20 p-1.5">
+                                <Sparkles className="text-accent-primary" size={20} />
+                            </div>
+                            <h2 className="text-xl font-display font-semibold text-white">Recommended from This Search</h2>
+                        </div>
+
+                        {recommendationsLoading ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
+                                {Array.from({ length: 5 }, (_, index) => (
+                                    <div key={index} className="aspect-[2/3] bg-white/5 rounded-xl animate-pulse" />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-10 sm:gap-y-12 gap-x-3 sm:gap-x-6">
+                                {searchRecommendations.map((item) => (
+                                    <MovieCard key={`search-rec-${item.id}`} movie={item} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {loading ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">

@@ -5,6 +5,43 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p";
 
 const EMPTY_RESPONSE = { results: [], total_pages: 0, total_results: 0 };
+const REQUEST_CACHE_TTL_MS = 1000 * 60 * 15;
+const MAX_REQUEST_CACHE_ENTRIES = 250;
+const requestCache = new Map();
+const pendingRequests = new Map();
+let hasWarnedMissingApiKey = false;
+
+const emptyResponse = () => ({ ...EMPTY_RESPONSE });
+
+const getNormalizedParams = (params = {}) => (
+    Object.keys(params)
+        .sort()
+        .reduce((acc, key) => {
+            const value = params[key];
+            if (value === undefined || value === null || value === "") return acc;
+            acc[key] = Array.isArray(value) ? value.join(",") : value;
+            return acc;
+        }, {})
+);
+
+const getCacheKey = (endpoint, params = {}) => `${endpoint}?${JSON.stringify(getNormalizedParams(params))}`;
+
+const trimRequestCache = () => {
+    if (requestCache.size <= MAX_REQUEST_CACHE_ENTRIES) return;
+
+    const now = Date.now();
+    for (const [key, entry] of requestCache) {
+        if (entry.expiresAt <= now || requestCache.size > MAX_REQUEST_CACHE_ENTRIES) {
+            requestCache.delete(key);
+        }
+        if (requestCache.size <= MAX_REQUEST_CACHE_ENTRIES) break;
+    }
+};
+
+const normalizeTmdbId = (id) => {
+    const numericId = Number(id);
+    return Number.isInteger(numericId) && numericId > 0 ? numericId : null;
+};
 
 // Helper to get API key (Priority: NEXT_PUBLIC, VITE, Process Env)
 const getApiKey = () => {
@@ -35,22 +72,66 @@ api.interceptors.request.use((config) => {
 });
 
 // Robust Error Handling Wrapper
-const fetchFromApi = async (endpoint, params = {}) => {
+const fetchFromApi = async (endpoint, params = {}, options = {}) => {
+    const { cache = true, cacheTtlMs = REQUEST_CACHE_TTL_MS } = options;
     try {
         const apiKey = getApiKey();
         if (!apiKey) {
-            console.warn("[TMDB] Missing API key. Returning an empty response.");
-            return { ...EMPTY_RESPONSE };
+            if (!hasWarnedMissingApiKey) {
+                console.warn("[TMDB] Missing API key. Returning an empty response.");
+                hasWarnedMissingApiKey = true;
+            }
+            return emptyResponse();
         }
-        const { data } = await api.get(endpoint, { params });
-        return data || { ...EMPTY_RESPONSE };
+
+        const cacheKey = cache ? getCacheKey(endpoint, params) : null;
+
+        if (cacheKey) {
+            const cached = requestCache.get(cacheKey);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.data;
+            }
+            if (cached) requestCache.delete(cacheKey);
+
+            const pending = pendingRequests.get(cacheKey);
+            if (pending) return pending;
+        }
+
+        let shouldCacheResponse = true;
+        const request = api.get(endpoint, { params })
+            .then(({ data }) => data || emptyResponse())
+            .catch((error) => {
+                shouldCacheResponse = false;
+                if (error.code === 'ECONNABORTED') {
+                    console.error(`[TMDB] Timeout fetching ${endpoint}`);
+                } else {
+                    console.error(`[TMDB] Error fetching ${endpoint}:`, error.message);
+                }
+                return emptyResponse();
+            })
+            .finally(() => {
+                if (cacheKey) pendingRequests.delete(cacheKey);
+            });
+
+        if (cacheKey) pendingRequests.set(cacheKey, request);
+
+        const data = await request;
+        if (cacheKey && shouldCacheResponse) {
+            requestCache.set(cacheKey, {
+                data,
+                expiresAt: Date.now() + cacheTtlMs,
+            });
+            trimRequestCache();
+        }
+
+        return data;
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
             console.error(`[TMDB] Timeout fetching ${endpoint}`);
         } else {
             console.error(`[TMDB] Error fetching ${endpoint}:`, error.message);
         }
-        return { ...EMPTY_RESPONSE }; // Return empty structure instead of null
+        return emptyResponse(); // Return empty structure instead of null
     }
 };
 
@@ -73,6 +154,40 @@ export const getTopRatedMovies = (page = 1) =>
 
 export const getMovieDetails = (id) =>
     fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,release_dates" });
+
+export const getMovieSummary = (id) => {
+    const movieId = normalizeTmdbId(id);
+    return movieId ? fetchFromApi(`/movie/${movieId}`) : Promise.resolve(emptyResponse());
+};
+
+export const getMovieSummaries = async (ids = [], limit = 15, concurrency = 4) => {
+    const uniqueIds = [];
+    const seen = new Set();
+
+    for (const id of ids) {
+        const movieId = normalizeTmdbId(id);
+        if (!movieId || seen.has(movieId)) continue;
+        seen.add(movieId);
+        uniqueIds.push(movieId);
+        if (uniqueIds.length >= limit) break;
+    }
+
+    if (uniqueIds.length === 0) return [];
+
+    const results = new Array(uniqueIds.length);
+    let cursor = 0;
+    const workerCount = Math.min(Math.max(1, concurrency), uniqueIds.length);
+
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+        while (cursor < uniqueIds.length) {
+            const index = cursor;
+            cursor += 1;
+            results[index] = await getMovieSummary(uniqueIds[index]).catch(() => null);
+        }
+    }));
+
+    return results.filter((movie) => movie && movie.id);
+};
 
 export const searchMovies = (query, page = 1) =>
     fetchFromApi("/search/movie", { query, page });
