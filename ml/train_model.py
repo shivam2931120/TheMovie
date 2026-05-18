@@ -15,6 +15,10 @@ RECOMMENDATIONS_PATH = "src/data/recommendations.json"
 TOP_SEARCH_TERMS = 28
 RECOMMENDATION_COUNT = 20
 CHUNK_SIZE = 256
+SVD_COMPONENTS = 80
+COLLAB_WEIGHT = 0.68
+CONTENT_WEIGHT = 0.32
+QUALITY_WEIGHT = 0.04
 
 def clean_title(title):
     return re.sub(r"\s*\(\d{4}\)\s*$", "", str(title)).strip()
@@ -48,6 +52,13 @@ def build_search_index(movies, ratings, tags):
     search_movies["rating_count"] = search_movies["rating_count"].fillna(0).astype(int)
     search_movies["rating_mean"] = search_movies["rating_mean"].fillna(global_mean)
     search_movies["quality"] = search_movies["quality"].fillna(global_mean)
+    search_movies = (
+        search_movies
+        .sort_values(["tmdbId", "rating_count", "quality"], ascending=[True, False, False])
+        .drop_duplicates(subset=["tmdbId"], keep="first")
+        .sort_values("movieId")
+        .reset_index(drop=True)
+    )
     search_movies["tag_text"] = search_movies["tag_text"].fillna("")
     search_movies["clean_title"] = search_movies["title"].apply(clean_title)
     search_movies["year"] = search_movies["title"].apply(extract_year)
@@ -183,13 +194,13 @@ def train_and_export():
     
     # Reduce to latent preference features. 80 components keeps more signal than
     # the previous 50 while staying small enough for fast offline generation.
-    svd = TruncatedSVD(n_components=80, random_state=42)
+    svd = TruncatedSVD(n_components=SVD_COMPONENTS, random_state=42)
     latent_matrix = svd.fit_transform(sparse_user_movie)
 
     # ---------------------------------------------------------
     # PART C: Hybrid Fusion
     # ---------------------------------------------------------
-    print("⚗️ Fusing Models (68% Human / 32% Content + Quality Rerank)...")
+    print(f"⚗️ Fusing Models ({COLLAB_WEIGHT:.0%} Human / {CONTENT_WEIGHT:.0%} Content + Quality Rerank)...")
     
     # Re-compute content vectors after filtering to the rated movie universe.
     tfidf_matrix_filtered = tfidf.fit_transform(movies['content'])
@@ -223,7 +234,11 @@ def train_and_export():
         end = min(start + CHUNK_SIZE, total)
         collab_chunk = cosine_similarity(latent_matrix[start:end], latent_matrix)
         content_chunk = cosine_similarity(tfidf_matrix_filtered[start:end], tfidf_matrix_filtered)
-        hybrid_chunk = (0.68 * collab_chunk) + (0.32 * content_chunk) + (0.04 * quality[np.newaxis, :])
+        hybrid_chunk = (
+            (COLLAB_WEIGHT * collab_chunk)
+            + (CONTENT_WEIGHT * content_chunk)
+            + (QUALITY_WEIGHT * quality[np.newaxis, :])
+        )
 
         for local_idx, scores in enumerate(hybrid_chunk):
             idx = start + local_idx

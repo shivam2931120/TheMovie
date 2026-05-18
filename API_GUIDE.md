@@ -1,11 +1,19 @@
-# OMDB API Integration
+# Movie Data API Integration
 
-This app uses **OMDB (Open Movie Database)** for comprehensive movie data.
+This app uses **TMDB** as the primary movie and TV data source. **OMDB** is optional and remains available as an enrichment/fallback helper.
 
-## OMDB Features
+## TMDB Features
 
 **Primary source** for:
 - Search movies by title
+- Search TV shows and people
+- Discover by genre, year, rating, language, runtime, and provider
+- Movie and TV details with cast, trailers, reviews, providers, collections, and seasons
+
+## OMDB Features
+
+**Optional source** for:
+- Movie search and details fallback
 - Movie details with full plot
 - IMDb, Rotten Tomatoes, Metacritic ratings
 - Awards & nominations
@@ -17,10 +25,15 @@ This app uses **OMDB (Open Movie Database)** for comprehensive movie data.
 
 ## Setup
 
-1. Visit https://www.omdbapi.com/apikey.aspx
-2. Select **FREE tier** (1,000 requests/day)
-3. Verify your email
-4. Add key to `.env.local`:
+1. Get a TMDB API key from https://www.themoviedb.org/settings/api
+2. Add it to `.env.local`:
+
+```bash
+NEXT_PUBLIC_TMDB_API_KEY=your_key_here
+```
+
+3. Optionally get an OMDB key from https://www.omdbapi.com/apikey.aspx
+4. Add it to `.env.local`:
 
 ```bash
 NEXT_PUBLIC_OMDB_API_KEY=your_key_here
@@ -28,7 +41,7 @@ NEXT_PUBLIC_OMDB_API_KEY=your_key_here
 
 ## API Functions
 
-All functions are in `src/api/omdb.js`:
+Primary app functions are in `src/api/tmdb.js`. Optional OMDB helper functions are in `src/api/omdb.js`:
 
 ### Search Movies
 ```javascript
@@ -149,6 +162,7 @@ All functions return data in a normalized format compatible with the UI:
 
 ## Notes
 
+- TMDB returns numeric IDs used by the main app routes
 - OMDB returns IMDb IDs as movie identifiers
 - All poster/backdrop URLs are full CDN links (no path prefix needed)
 - Ratings include IMDb, Rotten Tomatoes, and Metacritic when available

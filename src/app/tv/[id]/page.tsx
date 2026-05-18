@@ -18,6 +18,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { AIRecommendations } from "@/components/AIRecommendations";
 import { useLists } from "@/context/ListsContext";
+import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
 
 export default function TVDetailsPage() {
     const { id } = useParams();
@@ -33,6 +34,7 @@ export default function TVDetailsPage() {
     const [seasonLoading, setSeasonLoading] = useState(false);
     const [showListDropdown, setShowListDropdown] = useState(false);
     const [newListName, setNewListName] = useState("");
+    const { openSignIn } = useClerk();
 
     // Scroll to top on mount to ensure navbar hides properly
     useEffect(() => {
@@ -304,75 +306,85 @@ export default function TVDetailsPage() {
                                             Watch Trailer
                                         </button>
                                     )}
-                                    <button
-                                        onClick={handleWatchlist}
-                                        className={clsx(
-                                            "flex items-center gap-2 px-6 py-4 border backdrop-blur-md text-white font-medium rounded-xl transition-all",
-                                            isWatchlisted ? "bg-accent-secondary border-accent-secondary" : "bg-white/10 hover:bg-white/20 border-white/10"
-                                        )}
-                                    >
-                                        {isWatchlisted ? <Check size={20} /> : <Plus size={20} />}
-                                        {isWatchlisted ? "Added" : "Watchlist"}
-                                    </button>
-                                    <button
-                                        onClick={handleWatched}
-                                        className={clsx(
-                                            "flex items-center gap-2 px-6 py-4 border backdrop-blur-md text-white font-medium rounded-xl transition-all",
-                                            isWatched ? "bg-green-600 border-green-600" : "bg-white/10 hover:bg-white/20 border-white/10"
-                                        )}
-                                    >
-                                        {isWatched ? <Eye size={20} /> : <EyeOff size={20} />}
-                                        {isWatched ? "Watched" : "Mark Watched"}
-                                    </button>
-                                    <div className="relative">
+                                    <SignedIn>
                                         <button
-                                            onClick={() => setShowListDropdown(!showListDropdown)}
-                                            className="flex items-center gap-2 px-6 py-4 border border-white/10 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-medium rounded-xl transition-all"
+                                            onClick={handleWatchlist}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-6 py-4 border backdrop-blur-md text-white font-medium rounded-xl transition-all",
+                                                isWatchlisted ? "bg-accent-secondary border-accent-secondary" : "bg-white/10 hover:bg-white/20 border-white/10"
+                                            )}
                                         >
-                                            <ListIcon size={20} />
-                                            Add to List
+                                            {isWatchlisted ? <Check size={20} /> : <Plus size={20} />}
+                                            {isWatchlisted ? "Added" : "Watchlist"}
                                         </button>
+                                        <button
+                                            onClick={handleWatched}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-6 py-4 border backdrop-blur-md text-white font-medium rounded-xl transition-all",
+                                                isWatched ? "bg-green-600 border-green-600" : "bg-white/10 hover:bg-white/20 border-white/10"
+                                            )}
+                                        >
+                                            {isWatched ? <Eye size={20} /> : <EyeOff size={20} />}
+                                            {isWatched ? "Watched" : "Mark Watched"}
+                                        </button>
+                                        <div className="relative">
+                                            <button
+                                                onClick={() => setShowListDropdown(!showListDropdown)}
+                                                className="flex items-center gap-2 px-6 py-4 border border-white/10 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-medium rounded-xl transition-all"
+                                            >
+                                                <ListIcon size={20} />
+                                                Add to List
+                                            </button>
 
-                                        {showListDropdown && (
-                                            <div className="absolute top-full left-0 mt-2 w-64 bg-bg-card border border-white/10 rounded-xl shadow-2xl p-4 z-50 backdrop-blur-xl">
-                                                <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
-                                                    <h4 className="text-white font-bold text-sm">Save to List</h4>
-                                                    <button onClick={() => setShowListDropdown(false)} className="text-text-muted hover:text-white">
-                                                        <X size={16} />
-                                                    </button>
+                                            {showListDropdown && (
+                                                <div className="absolute top-full left-0 mt-2 w-64 bg-bg-card border border-white/10 rounded-xl shadow-2xl p-4 z-50 backdrop-blur-xl">
+                                                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+                                                        <h4 className="text-white font-bold text-sm">Save to List</h4>
+                                                        <button onClick={() => setShowListDropdown(false)} className="text-text-muted hover:text-white">
+                                                            <X size={16} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
+                                                        {lists.map((list: any) => {
+                                                            const inList = isInList(list.id, show.id, 'tv');
+                                                            return (
+                                                                <button
+                                                                    key={list.id}
+                                                                    onClick={() => handleListToggle(list.id)}
+                                                                    className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-left group"
+                                                                >
+                                                                    <span className="text-sm text-white group-hover:text-accent-primary transition-colors">{list.name}</span>
+                                                                    {inList && <Check size={16} className="text-accent-primary" />}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <form onSubmit={handleCreateList} className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="New List..."
+                                                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent-primary"
+                                                            value={newListName}
+                                                            onChange={(event) => setNewListName(event.target.value)}
+                                                        />
+                                                        <button type="submit" disabled={!newListName.trim()} className="bg-accent-primary px-3 rounded-lg text-white text-xs font-bold hover:bg-accent-primary/80 disabled:opacity-50">
+                                                            +
+                                                        </button>
+                                                    </form>
                                                 </div>
-
-                                                <div className="space-y-2 mb-4 max-h-[200px] overflow-y-auto">
-                                                    {lists.map((list: any) => {
-                                                        const inList = isInList(list.id, show.id, 'tv');
-                                                        return (
-                                                            <button
-                                                                key={list.id}
-                                                                onClick={() => handleListToggle(list.id)}
-                                                                className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-all text-left group"
-                                                            >
-                                                                <span className="text-sm text-white group-hover:text-accent-primary transition-colors">{list.name}</span>
-                                                                {inList && <Check size={16} className="text-accent-primary" />}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <form onSubmit={handleCreateList} className="flex gap-2">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="New List..."
-                                                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent-primary"
-                                                        value={newListName}
-                                                        onChange={(event) => setNewListName(event.target.value)}
-                                                    />
-                                                    <button type="submit" disabled={!newListName.trim()} className="bg-accent-primary px-3 rounded-lg text-white text-xs font-bold hover:bg-accent-primary/80 disabled:opacity-50">
-                                                        +
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        )}
-                                    </div>
+                                            )}
+                                        </div>
+                                    </SignedIn>
+                                    <SignedOut>
+                                        <button
+                                            onClick={() => openSignIn()}
+                                            className="flex items-center gap-2 px-6 py-4 border border-white/10 bg-white/5 hover:bg-white/10 backdrop-blur-md text-text-secondary font-medium rounded-xl transition-all"
+                                        >
+                                            Sign in to track
+                                        </button>
+                                    </SignedOut>
                                 </div>
                             </div>
 

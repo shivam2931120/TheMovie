@@ -11,14 +11,17 @@
    - Application name: "Movie Catalogue"
    - Choose your sign-in options (Email, Google, GitHub, etc.)
 
-### 2. Get Your Publishable Key
+### 2. Get Your Clerk Keys
 
 1. In Clerk Dashboard, go to **API Keys**
 2. Copy your **Publishable Key** (starts with `pk_test_...` or `pk_live_...`)
-3. Add it to your `.env.local` file:
+3. Optionally copy your **Secret Key** if you want Clerk server-side auth/proxy support
+4. Add them to your `.env.local` file:
 
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
+# Optional, server-only
+CLERK_SECRET_KEY=sk_test_your_key_here
 ```
 
 ### 3. Configure Clerk Paths
@@ -69,9 +72,10 @@ In Clerk Dashboard → **User & Authentication** → **Social Connections**:
 - Account settings
 - Sign out
 
-✅ **Protected Routes**
-- Watchlist page requires authentication
-- Automatic redirect to sign-in
+✅ **Next.js Proxy Integration**
+- Uses the Next.js 16 `proxy.ts` convention
+- Runs Clerk server-side auth only when `CLERK_SECRET_KEY` is configured
+- Falls back safely to client-side auth components when only the publishable key is present
 
 ✅ **Per-User Watchlist**
 - Each user has their own watchlist
@@ -91,6 +95,7 @@ In Clerk Dashboard → **User & Authentication** → **Social Connections**:
 3. Add environment variables:
    - `NEXT_PUBLIC_TMDB_API_KEY` = your TMDB key
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` = your Clerk key
+   - `CLERK_SECRET_KEY` = your Clerk secret key (optional, server-side auth/proxy only)
 4. Deploy!
 
 ### Option 2: Vercel CLI
@@ -108,6 +113,8 @@ vercel
 # Add environment variables
 vercel env add NEXT_PUBLIC_TMDB_API_KEY
 vercel env add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+# Optional, server-side auth/proxy only
+vercel env add CLERK_SECRET_KEY
 
 # Deploy to production
 vercel --prod
@@ -168,7 +175,7 @@ See: https://clerk.com/docs/integrations/webhooks
 - ✅ Never commit `.env.local` (it's in `.gitignore`)
 - ✅ Use `NEXT_PUBLIC_` prefix for browser-readable Next.js env vars
 - ✅ Clerk keys starting with `pk_` are safe for client-side
-- ⚠️ Never expose secret keys (starting with `sk_`) in client code
+- ⚠️ Never expose secret keys (starting with `sk_`) in client code or with a `NEXT_PUBLIC_` prefix
 
 ## Cost
 

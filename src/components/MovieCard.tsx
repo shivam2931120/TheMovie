@@ -99,6 +99,11 @@ export function MovieCard({ movie, className }: MovieCardProps) {
         e.preventDefault();
         e.stopPropagation();
 
+        if (!isSignedIn) {
+            openSignIn();
+            return;
+        }
+
         if (personalScore === score) {
             await deleteRatingForItem(movie.id, type);
             return;

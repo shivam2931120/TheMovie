@@ -1,6 +1,6 @@
 # TheMovie - Movie Catalogue App
 
-A modern Next.js movie catalogue application powered by **TMDB**, with Clerk authentication and watchlist features.
+A modern Next.js movie catalogue application powered by **TMDB**, with Clerk authentication, custom lists, ratings, and watch progress features.
 
 ## Features
 
@@ -45,15 +45,20 @@ npm install
 
 ### 2. Get API Keys
 
-**OMDB API** (Required)
-1. Visit https://www.omdbapi.com/apikey.aspx
-2. Select FREE tier (1,000 requests/day)
-3. Verify your email and copy the key
+**TMDB API** (Required for movie and TV data)
+1. Visit https://www.themoviedb.org/settings/api
+2. Create or sign in to a TMDB account
+3. Copy your API key
 
 **Clerk** (Required for auth)
 1. Visit https://dashboard.clerk.com
 2. Create a new application
 3. Copy your Publishable Key
+
+**OMDB API** (Optional enrichment/fallback)
+1. Visit https://www.omdbapi.com/apikey.aspx
+2. Select FREE tier (1,000 requests/day)
+3. Verify your email and copy the key
 
 ### 3. Environment Setup
 
@@ -63,6 +68,8 @@ Create `.env.local`:
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
 NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_key_here
 NEXT_PUBLIC_OMDB_API_KEY=your_omdb_key_here
+# Optional, only for Clerk server-side auth/proxy features
+CLERK_SECRET_KEY=your_clerk_secret_key_here
 ```
 
 ### 4. Run Development Server
@@ -78,22 +85,30 @@ Visit http://localhost:3000
 ```
 src/
 ├── api/
-│   └── omdb.js              # OMDB API integration
+│   ├── tmdb.js              # TMDB API integration
+│   ├── omdb.js              # Optional OMDB helper
+│   └── tastedive.js         # Optional TV recommendation helper
+├── app/
+│   ├── page.tsx             # Home
+│   ├── movies/page.tsx      # Movie discovery
+│   ├── tv/page.tsx          # TV discovery
+│   ├── movie/[id]/page.tsx  # Movie details
+│   ├── tv/[id]/page.tsx     # TV details
+│   ├── search/page.tsx      # Advanced search
+│   └── api/ai-recommend/    # Local recommendation endpoint
 ├── components/
-│   ├── MovieCard.jsx        # Movie tile component
-│   ├── WatchlistButton.jsx  # Add to watchlist
-│   ├── WatchedButton.jsx    # Mark as watched
-│   ├── Filters.jsx          # Genre/year/rating filters
-│   └── AuthWrapper.jsx      # Clerk auth components
+│   ├── MovieCard.tsx        # Movie/TV tile component
+│   ├── Hero.tsx             # Home hero carousel
+│   ├── MovieRow.tsx         # Horizontal media row
+│   ├── AdvancedFilters.tsx  # Discover filters and saved searches
+│   └── Providers.tsx        # Client providers
 ├── context/
-│   ├── WatchlistContext.jsx # Watchlist state management
-│   └── WatchedContext.jsx   # Watched list state
-├── pages/
-│   ├── Home.jsx             # Browse/search movies
-│   ├── MovieDetails.jsx     # Individual movie page
-│   ├── Watchlist.jsx        # User's watchlist
-│   └── Watched.jsx          # User's watched movies
-└── App.jsx                  # Main app with routing
+│   ├── WatchlistContext.jsx
+│   ├── WatchedContext.jsx
+│   ├── ListsContext.jsx
+│   ├── ReviewContext.jsx
+│   └── TVWatchProgressContext.tsx
+└── proxy.ts                 # Optional Clerk server-side proxy
 ```
 
 ## API Integration
@@ -113,6 +128,7 @@ Add environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_TMDB_API_KEY`
 - `NEXT_PUBLIC_OMDB_API_KEY` (optional)
+- `CLERK_SECRET_KEY` (optional, only for Clerk server-side auth/proxy features)
 
 ### Build for Production
 
@@ -137,5 +153,6 @@ MIT
 
 ## Credits
 
-- Movie data powered by [OMDb API](https://www.omdbapi.com)
+- Movie and TV data powered by [TMDB](https://www.themoviedb.org)
+- Optional enrichment powered by [OMDb API](https://www.omdbapi.com)
 - Authentication by [Clerk](https://clerk.com)

@@ -272,8 +272,8 @@ export function Hero() {
                             aria-label={`Watch trailer for ${movie.title}`}
                         >
                             <Play fill="currentColor" size={18} />
-                            <span className="hidden xs:inline">{loadingTrailer ? "Loading..." : "Watch Trailer"}</span>
-                            <span className="xs:hidden">{loadingTrailer ? "..." : "Trailer"}</span>
+                            <span className="hidden sm:inline">{loadingTrailer ? "Loading..." : "Watch Trailer"}</span>
+                            <span className="sm:hidden">{loadingTrailer ? "..." : "Trailer"}</span>
                         </button>
 
                         <Link
@@ -282,8 +282,8 @@ export function Hero() {
                             aria-label={`More info about ${movie.title}`}
                         >
                             <Info size={18} />
-                            <span className="hidden xs:inline">More Info</span>
-                            <span className="xs:hidden">Info</span>
+                            <span className="hidden sm:inline">More Info</span>
+                            <span className="sm:hidden">Info</span>
                         </Link>
 
                         <button
