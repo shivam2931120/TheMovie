@@ -1,10 +1,10 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 
-const clerkProxy = clerkMiddleware({
-    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY,
-    secretKey: process.env.CLERK_SECRET_KEY,
-});
+// Clerk reads the publishable and secret keys from the environment. Passing
+// them as middleware options opts into dynamic-key propagation, which also
+// requires CLERK_ENCRYPTION_KEY.
+const clerkProxy = clerkMiddleware();
 
 function hasClerkServerConfig() {
     return Boolean(
