@@ -153,7 +153,7 @@ export const getTopRatedMovies = (page = 1) =>
     fetchFromApi("/movie/top_rated", { page });
 
 export const getMovieDetails = (id) =>
-    fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,release_dates" });
+    fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,release_dates,external_ids" });
 
 export const getMovieSummary = (id) => {
     const movieId = normalizeTmdbId(id);

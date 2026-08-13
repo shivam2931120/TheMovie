@@ -1,32 +1,31 @@
 @import "tailwindcss";
 
 :root {
-    --bg-main: #050505;
-    --bg-section: #0B0B0B;
-    --bg-card: #121212;
-    --bg-elevated: #181818;
+    --bg-main: #030305;
+    --bg-secondary: #07070C;
+    --bg-surface: #0B0B11;
+    --bg-elevated: #111118;
 
-    --accent-primary: #E50914;
+    --accent-primary: #FF3158;
     --accent-secondary: #8B5CF6;
-    --accent-highlight: #22D3EE;
 
     --text-primary: #FFFFFF;
-    --text-secondary: #CFCFCF;
-    --text-muted: #8A8A8A;
+    --text-secondary: #A1A1AA;
+    --text-muted: #71717A;
 
     --font-inter: 'Inter', sans-serif;
-    --font-clash: 'Clash Display', sans-serif;
+    --font-dm-sans: 'DM Sans', sans-serif;
+    --font-outfit: 'Outfit', sans-serif;
 }
 
 @theme {
     --color-bg-main: var(--bg-main);
-    --color-bg-section: var(--bg-section);
-    --color-bg-card: var(--bg-card);
+    --color-bg-secondary: var(--bg-secondary);
+    --color-bg-surface: var(--bg-surface);
     --color-bg-elevated: var(--bg-elevated);
 
     --color-accent-primary: var(--accent-primary);
     --color-accent-secondary: var(--accent-secondary);
-    --color-accent-highlight: var(--accent-highlight);
 
     --color-text-primary: var(--text-primary);
     --color-text-secondary: var(--text-secondary);
@@ -65,45 +64,28 @@ html {
 
 /* Smooth horizontal scrolling */
 .horizontal-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(229, 9, 20, 0.5) rgba(255, 255, 255, 0.05);
+  scrollbar-width: none; /* Hide scrollbar completely as requested */
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   scroll-padding: 0 1rem;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
-  height: 10px;
-}
-
-.horizontal-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 5px;
-  margin: 0 1rem;
-}
-
-.horizontal-scroll::-webkit-scrollbar-thumb {
-  background: rgba(229, 9, 20, 0.5);
-  border-radius: 5px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-}
-
-.horizontal-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(229, 9, 20, 0.7);
+  display: none;
 }
 
 /* Film Grain Texture */
 .film-grain::before {
     content: "";
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    width: 100vw;
+    height: 100vh;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
     pointer-events: none;
-    z-index: 50;
-    opacity: 0.4;
+    z-index: 9999;
+    opacity: 0.035; /* Subtle grain as requested */
 }
 
 /* Responsive Container */
@@ -116,18 +98,8 @@ html {
 /* Mobile Optimizations */
 @media (max-width: 640px) {
     .container {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
-    
-    h1 {
-        font-size: 1.875rem !important;
-        line-height: 2.25rem !important;
-    }
-    
-    h2 {
-        font-size: 1.5rem !important;
-        line-height: 2rem !important;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
     }
 }
 
@@ -162,4 +134,13 @@ textarea:focus-visible {
 /* Remove default outline for mouse users */
 *:focus:not(:focus-visible) {
     outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

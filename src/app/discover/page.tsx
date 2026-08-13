@@ -21,30 +21,26 @@ function DiscoverContent() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
 
-    // Random Picker State
     const [randomGenre, setRandomGenre] = useState("");
     const [randomRating, setRandomRating] = useState("");
     const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
     const [provider, setProvider] = useState("");
-    const [providerRegion, setProviderRegion] = useState("IN");
+    const [providerRegion, setProviderRegion] = useState("US");
     const [providers, setProviders] = useState<any[]>([]);
+    
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeWatchProvider = searchParams.get("with_watch_providers") || "";
-    const activeWatchRegion = searchParams.get("watch_region") || "IN";
+    const activeWatchRegion = searchParams.get("watch_region") || "US";
 
     useEffect(() => {
         setProvider(activeWatchProvider);
         setProviderRegion(activeWatchRegion);
     }, [activeWatchProvider, activeWatchRegion]);
 
-    // Load saved searches
     useEffect(() => {
         setSavedSearches(getSavedSearches());
-        // Re-check when filters panel might save 
-        const onStorage = (e: StorageEvent) => {
-            if (e.key === "themovie_saved_searches") setSavedSearches(getSavedSearches());
-        };
+        const onStorage = (e: StorageEvent) => { if (e.key === "themovie_saved_searches") setSavedSearches(getSavedSearches()); };
         const onSavedSearches = () => setSavedSearches(getSavedSearches());
         window.addEventListener("storage", onStorage);
         window.addEventListener("themovie-saved-searches", onSavedSearches);
@@ -67,7 +63,6 @@ function DiscoverContent() {
         router.push(`/discover?${params.toString()}`);
     };
 
-    // Fetch initial genres for random picker
     useEffect(() => {
         async function loadGenres() {
             const genreData = await getMovieGenres();
@@ -78,19 +73,14 @@ function DiscoverContent() {
 
     useEffect(() => {
         let isMounted = true;
-
         async function loadProviders() {
             const data = await getMovieWatchProviderList(providerRegion);
-            if (isMounted) {
-                setProviders((data?.results || []).sort((a: any, b: any) => a.provider_name.localeCompare(b.provider_name)));
-            }
+            if (isMounted) setProviders((data?.results || []).sort((a: any, b: any) => a.provider_name.localeCompare(b.provider_name)));
         }
-
         loadProviders();
         return () => { isMounted = false; };
     }, [providerRegion]);
 
-    // Fetch Content based on URL Params (Filters)
     useEffect(() => {
         async function loadContent() {
             setLoading(true);
@@ -104,7 +94,7 @@ function DiscoverContent() {
             const language = searchParams.get("language");
             const certification = searchParams.get("certification");
             const watchProvider = searchParams.get("with_watch_providers");
-            const watchRegion = searchParams.get("watch_region") || "IN";
+            const watchRegion = searchParams.get("watch_region") || "US";
             
             setCurrentPage(page);
 
@@ -114,8 +104,6 @@ function DiscoverContent() {
                 filters.with_watch_providers = watchProvider;
                 filters.watch_region = watchRegion;
             }
-            
-            // Apply advanced filters
             if (yearMin) filters["primary_release_date.gte"] = `${yearMin}-01-01`;
             if (yearMax) filters["primary_release_date.lte"] = `${yearMax}-12-31`;
             if (runtime) {
@@ -129,7 +117,6 @@ function DiscoverContent() {
                 filters.certification = certification;
             }
 
-            // Handle Presets (override advanced filters if present)
             if (preset === 'era') {
                 setActivePreset('era');
                 filters["primary_release_date.gte"] = "1980-01-01";
@@ -159,7 +146,7 @@ function DiscoverContent() {
             const data = await getDiscoverMovies(filters);
             if (data?.results) {
                 setMovies(data.results);
-                setTotalPages(Math.min(data.total_pages || 1, 500)); // TMDB limits to 500 pages
+                setTotalPages(Math.min(data.total_pages || 1, 500));
             }
             setLoading(false);
         }
@@ -168,8 +155,7 @@ function DiscoverContent() {
 
     const handleRandomPick = async () => {
         setLoading(true);
-        // Fetch a random page of movies based on filters
-        const page = Math.floor(Math.random() * 20) + 1; // Random page 1-20
+        const page = Math.floor(Math.random() * 20) + 1;
         const filters: any = { page };
         if (randomGenre) filters.with_genres = randomGenre;
         if (randomRating) filters["vote_average.gte"] = randomRating;
@@ -177,7 +163,6 @@ function DiscoverContent() {
         const data = await getDiscoverMovies(filters);
         if (data?.results && data.results.length > 0) {
             const randomMovie = data.results[Math.floor(Math.random() * data.results.length)];
-            // Navigate to the movie
             router.push(`/movie/${randomMovie.id}`);
         }
         setLoading(false);
@@ -185,13 +170,12 @@ function DiscoverContent() {
 
     const handlePreset = (preset: string) => {
         const params = new URLSearchParams(searchParams.toString());
-        if (activePreset === preset) {
-            params.delete("preset");
-        } else {
+        if (activePreset === preset) params.delete("preset");
+        else {
             params.set("preset", preset);
-            params.delete("with_genres"); // Clear genre when selecting preset for clarity
+            params.delete("with_genres");
         }
-        params.set("page", "1"); // Reset to first page
+        params.set("page", "1");
         router.push(`/discover?${params.toString()}`);
     };
 
@@ -223,180 +207,105 @@ function DiscoverContent() {
         const params = new URLSearchParams(searchParams.toString());
         params.set("page", newPage.toString());
         router.push(`/discover?${params.toString()}`);
-        window.scrollTo({ top: 0 });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     return (
-        <main className="min-h-screen pt-32 sm:pt-36 pb-20 bg-bg-main relative">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-20 mb-8 sm:mb-10">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                    <div>
-                        <h1 className="text-4xl font-display font-bold text-white mb-2 flex items-center gap-3">
-                            <span className="text-accent-primary">
-                                <Search size={32} />
-                            </span>
-                            Discover Movies
-                        </h1>
-                        <p className="text-text-secondary">Explore by era, awards, or let us pick for you</p>
+        <main className="min-h-screen pt-32 sm:pt-40 pb-20 bg-bg-main relative">
+            {/* Cinematic Gradient Background */}
+            <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-accent-primary/5 via-bg-main to-bg-main pointer-events-none" />
+
+            <div className="container relative mx-auto px-6 lg:px-20 mb-12">
+                <div className="mb-12">
+                    <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-bold text-white mb-4 tracking-tight flex items-center gap-4">
+                        Discover
+                    </h1>
+                    <p className="text-lg text-text-secondary max-w-2xl">Find your next cinematic journey.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-4 mb-10 items-center">
+                    <button onClick={() => handlePreset('era')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'era' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                        <Calendar size={18} /> 80s & 90s Classics
+                    </button>
+                    <button onClick={() => handlePreset('awards')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'awards' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                        <Trophy size={18} /> Top Rated
+                    </button>
+                    <button onClick={() => handlePreset('recent')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'recent' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                        <TrendingUp size={18} /> This Year
+                    </button>
+                    <button onClick={() => handlePreset('hidden')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'hidden' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                        <Star size={18} /> Hidden Gems
+                    </button>
+                    <button onClick={() => setShowRandomPicker(!showRandomPicker)} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", showRandomPicker ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                        {showRandomPicker ? <X size={18} /> : <Shuffle size={18} />} Random Pick
+                    </button>
+                    <div className="ml-auto">
+                        <AdvancedFilters />
                     </div>
                 </div>
 
-                {/* Feature Buttons */}
-                <div className="flex flex-wrap gap-4 mb-10">
-                    <button
-                        onClick={() => handlePreset('era')}
-                        className={clsx(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-colors",
-                            activePreset === 'era' ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                        )}
-                    >
-                        <Calendar size={18} /> 80s & 90s Classics
-                    </button>
-                    <button
-                        onClick={() => handlePreset('awards')}
-                        className={clsx(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-colors",
-                            activePreset === 'awards' ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                        )}
-                    >
-                        <Trophy size={18} /> Top Rated
-                    </button>
-                    <button
-                        onClick={() => handlePreset('recent')}
-                        className={clsx(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-colors",
-                            activePreset === 'recent' ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                        )}
-                    >
-                        <TrendingUp size={18} /> This Year
-                    </button>
-                    <button
-                        onClick={() => handlePreset('hidden')}
-                        className={clsx(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-colors",
-                            activePreset === 'hidden' ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                        )}
-                    >
-                        <Star size={18} /> Hidden Gems
-                    </button>
-                    <button
-                        onClick={() => setShowRandomPicker(!showRandomPicker)}
-                        className={clsx(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-full border transition-colors font-medium",
-                            showRandomPicker
-                                ? "bg-accent-primary border-accent-primary text-white"
-                                : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                        )}
-                    >
-                        {showRandomPicker ? <X size={18} /> : <Shuffle size={18} />}
-                        {showRandomPicker ? "Close Picker" : "Random Pick"}
-                    </button>
-                    <AdvancedFilters />
-                </div>
-
-                {/* Saved Searches Quick Access */}
-                <div className="rounded-xl border border-white/10 bg-bg-card p-4 sm:p-5 mb-6">
-                    <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-                        <div className="flex items-center gap-2 text-white lg:w-48">
-                            <MonitorPlay size={18} className="text-accent-primary" />
+                <div className="rounded-3xl border border-white/5 bg-bg-surface/50 backdrop-blur-xl p-6 mb-8 shadow-elevated">
+                    <div className="flex flex-col lg:flex-row lg:items-end gap-6">
+                        <div className="flex items-center gap-3 text-white lg:w-48">
+                            <div className="p-3 bg-accent-primary/10 text-accent-primary rounded-xl">
+                                <MonitorPlay size={20} />
+                            </div>
                             <div>
-                                <p className="text-sm font-bold">Streaming</p>
-                                <p className="text-xs text-text-muted">Filter Discover results</p>
+                                <p className="text-sm font-bold tracking-wide">Streaming</p>
+                                <p className="text-xs text-text-muted">Filter by provider</p>
                             </div>
                         </div>
 
                         <label className="flex-1">
-                            <span className="block text-xs font-semibold uppercase text-text-muted mb-2">Region</span>
-                            <select
-                                value={providerRegion}
-                                onChange={(event) => setProviderRegion(event.target.value)}
-                                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary focus:outline-none"
-                            >
-                                {REGIONS.map((item) => (
-                                    <option key={item} value={item} className="bg-bg-card">{item}</option>
-                                ))}
+                            <span className="block text-xs font-bold tracking-wider uppercase text-text-muted mb-2">Region</span>
+                            <select value={providerRegion} onChange={(event) => setProviderRegion(event.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary outline-none transition-colors">
+                                {REGIONS.map((item) => <option key={item} value={item} className="bg-bg-main">{item}</option>)}
                             </select>
                         </label>
 
                         <label className="flex-[2]">
-                            <span className="block text-xs font-semibold uppercase text-text-muted mb-2">Provider</span>
-                            <select
-                                value={provider}
-                                onChange={(event) => setProvider(event.target.value)}
-                                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary focus:outline-none"
-                            >
-                                <option value="" className="bg-bg-card">Any provider</option>
-                                {providers.map((item) => (
-                                    <option key={item.provider_id} value={item.provider_id} className="bg-bg-card">{item.provider_name}</option>
-                                ))}
+                            <span className="block text-xs font-bold tracking-wider uppercase text-text-muted mb-2">Provider</span>
+                            <select value={provider} onChange={(event) => setProvider(event.target.value)} className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:border-accent-primary outline-none transition-colors">
+                                <option value="" className="bg-bg-main">Any provider</option>
+                                {providers.map((item) => <option key={item.provider_id} value={item.provider_id} className="bg-bg-main">{item.provider_name}</option>)}
                             </select>
                         </label>
 
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={applyProviderFilter}
-                                className="rounded-xl bg-accent-primary px-5 py-3 text-sm font-bold text-white transition-all hover:bg-accent-primary/90"
-                            >
-                                Apply
-                            </button>
+                        <div className="flex gap-3">
+                            <button onClick={applyProviderFilter} className="rounded-xl bg-accent-primary px-6 py-3 text-sm font-bold text-white transition-all hover:scale-105 shadow-cinematic-glow">Apply</button>
                             {activeWatchProvider && (
-                                <button
-                                    type="button"
-                                    onClick={clearProviderFilter}
-                                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-text-secondary transition-all hover:text-white"
-                                    aria-label="Clear streaming provider filter"
-                                >
-                                    <X size={18} />
-                                </button>
+                                <button onClick={clearProviderFilter} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-white/10" aria-label="Clear"><X size={18} /></button>
                             )}
                         </div>
                     </div>
                 </div>
 
                 {savedSearches.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 mb-6">
-                        <span className="text-xs text-text-muted font-medium uppercase tracking-wider flex items-center gap-1">
-                            <Bookmark size={12} /> Saved
-                        </span>
+                    <div className="flex flex-wrap items-center gap-3 mb-8">
+                        <span className="text-xs text-text-muted font-bold uppercase tracking-wider flex items-center gap-1.5"><Bookmark size={14} /> Saved Filters</span>
                         {savedSearches.map(s => (
-                            <button
-                                key={s.id}
-                                onClick={() => handleLoadSavedSearch(s)}
-                                className="px-3 py-1.5 rounded-full text-xs font-medium bg-accent-primary/10 text-accent-primary border border-accent-primary/20 hover:bg-accent-primary/20 transition-colors"
-                            >
+                            <button key={s.id} onClick={() => handleLoadSavedSearch(s)} className="px-4 py-2 rounded-full text-xs font-bold bg-accent-primary/10 text-accent-primary border border-accent-primary/20 hover:bg-accent-primary/20 transition-all">
                                 {s.name}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {/* Random Picker Section */}
                 {showRandomPicker && (
-                    <div className="bg-bg-card border border-white/10 rounded-2xl p-8 mb-12 animate-fade-in-up text-center relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-bg-surface to-bg-main border border-white/10 rounded-3xl p-10 mb-12 text-center relative overflow-hidden shadow-elevated">
                         <div className="relative z-10 max-w-lg mx-auto">
-                            <div className="mx-auto w-12 h-12 bg-accent-primary/20 rounded-lg flex items-center justify-center text-accent-primary mb-4">
-                                <Shuffle size={24} />
+                            <div className="mx-auto w-16 h-16 bg-accent-secondary/20 rounded-2xl flex items-center justify-center text-accent-secondary mb-6 shadow-cinematic-glow">
+                                <Shuffle size={32} />
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Random Movie Picker</h3>
-                            <p className="text-text-secondary mb-8">Can't decide what to watch? Let fate decide!</p>
+                            <h3 className="text-3xl font-display font-bold text-white mb-3 tracking-tight">Fate's Pick</h3>
+                            <p className="text-text-secondary mb-10 text-lg">Can't decide what to watch? Let the cinematic gods choose for you.</p>
 
-                            <div className="flex gap-4 mb-8">
-                                <select
-                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent-primary appearance-none placeholder-white"
-                                    value={randomGenre}
-                                    onChange={(e) => setRandomGenre(e.target.value)}
-                                >
+                            <div className="flex gap-4 mb-10">
+                                <select className="flex-1 bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-accent-primary appearance-none transition-colors" value={randomGenre} onChange={(e) => setRandomGenre(e.target.value)}>
                                     <option value="" className="text-black">Any Genre</option>
-                                    {genres.map(g => (
-                                        <option key={g.id} value={g.id} className="text-black">{g.name}</option>
-                                    ))}
+                                    {genres.map(g => <option key={g.id} value={g.id} className="text-black">{g.name}</option>)}
                                 </select>
-                                <select
-                                    className="flex-1 bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-accent-primary appearance-none"
-                                    value={randomRating}
-                                    onChange={(e) => setRandomRating(e.target.value)}
-                                >
+                                <select className="flex-1 bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-accent-primary appearance-none transition-colors" value={randomRating} onChange={(e) => setRandomRating(e.target.value)}>
                                     <option value="" className="text-black">Any Rating</option>
                                     <option value="7" className="text-black">7+ Good</option>
                                     <option value="8" className="text-black">8+ Great</option>
@@ -404,105 +313,58 @@ function DiscoverContent() {
                                 </select>
                             </div>
 
-                            <button
-                                onClick={handleRandomPick}
-                                disabled={loading && showRandomPicker} // Disable while picking
-                                className="w-full py-4 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-xl transition-transform hover:scale-[1.02] shadow-lg shadow-accent-primary/20 disabled:opacity-50"
-                            >
-                                <Shuffle size={20} className="inline mr-2" />
-                                {loading && showRandomPicker ? "Picking..." : "Pick Random Movie"}
+                            <button onClick={handleRandomPick} disabled={loading && showRandomPicker} className="w-full py-5 bg-white text-bg-main font-bold text-lg rounded-xl transition-transform hover:scale-105 disabled:opacity-50">
+                                {loading && showRandomPicker ? "Consulting the oracle..." : "Pick Random Movie"}
                             </button>
                         </div>
-                        {/* Background Splashes */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-accent-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent-secondary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
                     </div>
                 )}
 
                 <Filters />
             </div>
 
-            <div className="container px-4 sm:px-6 lg:px-20 mx-auto">
+            <div className="container px-6 lg:px-20 mx-auto">
                 {loading && !showRandomPicker ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                         {[...Array(10)].map((_, i) => (
-                            <div key={i} className="aspect-[2/3] bg-white/5 rounded-xl animate-pulse" />
+                            <div key={i} className="aspect-[2/3] bg-bg-surface rounded-xl animate-pulse border border-white/5" />
                         ))}
                     </div>
                 ) : (
                     <>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-y-10 sm:gap-y-12 gap-x-3 sm:gap-x-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 sm:gap-x-6 gap-y-12">
                             {movies.map((movie) => (
                                 <MovieCard key={movie.id} movie={movie} />
                             ))}
                         </div>
 
-                        {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-16 mb-8">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="p-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                >
+                            <div className="flex items-center justify-center gap-3 mt-20 mb-8">
+                                <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                                     <ChevronLeft size={20} />
                                 </button>
 
                                 <div className="flex items-center gap-2">
                                     {currentPage > 2 && (
                                         <>
-                                            <button
-                                                onClick={() => handlePageChange(1)}
-                                                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                                            >
-                                                1
-                                            </button>
-                                            {currentPage > 3 && <span className="text-text-muted">...</span>}
+                                            <button onClick={() => handlePageChange(1)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">1</button>
+                                            {currentPage > 3 && <span className="text-text-muted px-2">...</span>}
                                         </>
                                     )}
 
-                                    {currentPage > 1 && (
-                                        <button
-                                            onClick={() => handlePageChange(currentPage - 1)}
-                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                                        >
-                                            {currentPage - 1}
-                                        </button>
-                                    )}
-
-                                    <button
-                                        className="px-4 py-2 rounded-lg bg-accent-primary border border-accent-primary text-white font-bold"
-                                    >
-                                        {currentPage}
-                                    </button>
-
-                                    {currentPage < totalPages && (
-                                        <button
-                                            onClick={() => handlePageChange(currentPage + 1)}
-                                            className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                                        >
-                                            {currentPage + 1}
-                                        </button>
-                                    )}
+                                    {currentPage > 1 && <button onClick={() => handlePageChange(currentPage - 1)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">{currentPage - 1}</button>}
+                                    <button className="px-5 py-2 rounded-full bg-accent-primary border border-accent-primary text-white font-bold">{currentPage}</button>
+                                    {currentPage < totalPages && <button onClick={() => handlePageChange(currentPage + 1)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">{currentPage + 1}</button>}
 
                                     {currentPage < totalPages - 1 && (
                                         <>
-                                            {currentPage < totalPages - 2 && <span className="text-text-muted">...</span>}
-                                            <button
-                                                onClick={() => handlePageChange(totalPages)}
-                                                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-                                            >
-                                                {totalPages}
-                                            </button>
+                                            {currentPage < totalPages - 2 && <span className="text-text-muted px-2">...</span>}
+                                            <button onClick={() => handlePageChange(totalPages)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">{totalPages}</button>
                                         </>
                                     )}
                                 </div>
 
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="p-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                                >
+                                <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                                     <ChevronRight size={20} />
                                 </button>
                             </div>
@@ -516,11 +378,7 @@ function DiscoverContent() {
 
 export default function DiscoverPage() {
     return (
-        <Suspense fallback={
-            <div className="min-h-screen pt-32 pb-20 bg-bg-main flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-accent-primary animate-spin" />
-            </div>
-        }>
+        <Suspense fallback={<div className="min-h-screen pt-32 pb-20 bg-bg-main flex items-center justify-center"><Loader2 className="w-12 h-12 text-accent-primary animate-spin" /></div>}>
             <DiscoverContent />
         </Suspense>
     );

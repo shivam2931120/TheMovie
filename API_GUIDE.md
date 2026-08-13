@@ -129,6 +129,24 @@ const recommendations = await getSimilarTvShows('Breaking Bad', 10);
 ]
 ```
 
+## FM-DB API (Optional IMDb Fallback)
+
+FM-DB is used only on movie detail pages when TMDB does not provide a usable
+poster or YouTube trailer. It does not require an API key.
+
+```javascript
+import { getFmdbMedia, getFmdbPoster } from './api/fmdb';
+
+const posterUrl = getFmdbPoster('tt1375666');
+const media = await getFmdbMedia('tt1375666');
+// media: { url, youtubeId } or null when FM-DB is unavailable
+```
+
+The app obtains the IMDb ID from TMDB's `external_ids` response. No FM-DB
+account, key, or environment variable is required. Because this is an
+optional third-party service, failures are ignored and the TMDB page remains
+usable.
+
 ## Response Format
 
 All functions return data in a normalized format compatible with the UI:

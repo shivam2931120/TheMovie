@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
-import { PlayCircle, Plus, Check, Eye, EyeOff, Star } from "lucide-react";
+import { PlayCircle, Plus, Check, Eye, EyeOff, Star, Info } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useContext } from "react";
@@ -14,25 +14,24 @@ import { useRatings } from "@/context/ReviewContext";
 interface Movie {
     id: number;
     title?: string;
-    name?: string; // For TV
+    name?: string;
     poster_path?: string | null;
     vote_average?: number | null;
     release_date?: string;
-    first_air_date?: string; // For TV
+    first_air_date?: string;
     overview?: string;
     type?: "movie" | "tv";
-    genre_ids?: number[];
-    genres?: Array<{ id: number; name: string }>;
 }
 
 interface MovieCardProps {
     movie: Movie;
     className?: string;
+    priority?: boolean;
 }
 
 const QUICK_RATING_SCORES = [2, 4, 6, 8, 10];
 
-export function MovieCard({ movie, className }: MovieCardProps) {
+export function MovieCard({ movie, className, priority = false }: MovieCardProps) {
     const { isSignedIn } = useUser();
     const { openSignIn } = useClerk();
 
@@ -42,15 +41,13 @@ export function MovieCard({ movie, className }: MovieCardProps) {
     const backgroundColor = useTransform(
         x,
         [-100, 0, 100],
-        ["rgba(34, 197, 94, 0.3)", "rgba(0, 0, 0, 0)", "rgba(229, 9, 20, 0.3)"]
+        ["rgba(34, 197, 94, 0.3)", "rgba(0, 0, 0, 0)", "rgba(255, 49, 88, 0.3)"]
     );
 
-    // Contexts
     const { has, add, remove } = useContext(WatchlistContext) as any;
     const { hasWatched, addWatched, removeWatched } = useContext(WatchedContext) as any;
     const { getRatingForItem, upsertRating, deleteRatingForItem } = useRatings() as any;
 
-    // Determine type based on props (crude but effective for combined card)
     const type = movie.type || (movie.name ? 'tv' : 'movie');
     const posterSrc = movie.poster_path
         ? movie.poster_path.startsWith("http")
@@ -63,58 +60,19 @@ export function MovieCard({ movie, className }: MovieCardProps) {
     const personalRating = getRatingForItem(movie.id, type);
     const personalScore = Number(personalRating?.rating || 0);
 
-    const handleWatchlist = (e: React.MouseEvent) => {
+    const handleAction = (e: React.MouseEvent, action: () => void) => {
         e.preventDefault();
         e.stopPropagation();
-
         if (!isSignedIn) {
             openSignIn();
             return;
         }
-
-        if (isWatchlisted) {
-            remove(movie.id, type);
-        } else {
-            add({ ...movie, type });
-        }
-    };
-
-    const handleWatched = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!isSignedIn) {
-            openSignIn();
-            return;
-        }
-
-        if (isWatched) {
-            removeWatched(movie.id, type);
-        } else {
-            addWatched({ ...movie, type });
-        }
-    };
-
-    const handleQuickRating = async (e: React.MouseEvent, score: number) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!isSignedIn) {
-            openSignIn();
-            return;
-        }
-
-        if (personalScore === score) {
-            await deleteRatingForItem(movie.id, type);
-            return;
-        }
-
-        await upsertRating({ ...movie, type }, score);
+        action();
     };
 
     const title = movie.title || movie.name;
     const date = movie.release_date || movie.first_air_date;
-    const year = date ? date.split("-")[0] : "N/A";
+    const year = date ? date.split("-")[0] : "";
     const rating = typeof movie.vote_average === "number" ? movie.vote_average : null;
 
     const handleDragEnd = (_event: any, info: PanInfo) => {
@@ -127,157 +85,128 @@ export function MovieCard({ movie, className }: MovieCardProps) {
             return;
         }
 
-        // Swipe right (> 50px or fast swipe) - Add to watchlist
         if (offset > 50 || velocity > 500) {
             if (!isWatchlisted) {
                 add({ ...movie, type });
                 setSwipeAction('watchlist');
                 setTimeout(() => setSwipeAction(null), 2000);
             }
-        }
-        // Swipe left (< -50px or fast swipe) - Mark as watched
-        else if (offset < -50 || velocity < -500) {
+        } else if (offset < -50 || velocity < -500) {
             if (!isWatched) {
                 addWatched({ ...movie, type });
                 setSwipeAction('watched');
                 setTimeout(() => setSwipeAction(null), 2000);
             }
         }
-
-        // Reset position
         x.set(0);
     };
 
     return (
         <motion.div
-            className={clsx("relative group rounded-xl overflow-hidden cursor-pointer touch-pan-y", className)}
+            className={clsx(
+                "relative group rounded-xl overflow-hidden cursor-pointer touch-pan-y shadow-elevated transition-transform duration-500 ease-out will-change-transform",
+                className
+            )}
             style={{ backgroundColor, x }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "50px" }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            whileHover={{ scale: 1.05, zIndex: 30 }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
             onDragEnd={handleDragEnd}
         >
-            {/* Swipe Indicators */}
             {swipeAction && (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-white font-bold text-sm shadow-lg"
-                    style={{
-                        backgroundColor: swipeAction === 'watchlist' ? '#E50914' : '#22C55E'
-                    }}
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-50 px-3 py-1 rounded-full text-white font-bold text-xs shadow-glass backdrop-blur-md whitespace-nowrap"
+                    style={{ backgroundColor: swipeAction === 'watchlist' ? 'var(--accent-primary)' : 'var(--status-success)' }}
                 >
-                    {swipeAction === 'watchlist' ? '✓ Added to Watchlist' : '✓ Marked as Watched'}
+                    {swipeAction === 'watchlist' ? 'Added' : 'Watched'}
                 </motion.div>
             )}
-            {/* Poster */}
-            <div className="relative aspect-[2/3] w-full bg-bg-card">
+
+            <div className="relative aspect-[2/3] w-full bg-bg-surface overflow-hidden">
                 {posterSrc ? (
                     <Image
                         src={posterSrc}
                         alt={title || "Movie"}
                         fill
-                        className={clsx(
-                            "object-cover transition-transform duration-500",
-                            isHovered ? "scale-105 saturate-100" : "scale-100 saturate-[0.8]"
-                        )}
-                        sizes="(max-width: 768px) 50vw, 33vw"
+                        priority={priority}
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110"
                     />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted">No Image</div>
+                    <div className="w-full h-full flex flex-col items-center justify-center text-text-muted bg-bg-elevated p-4 text-center">
+                        <span className="text-sm font-medium">{title}</span>
+                        <span className="text-xs mt-1">{year}</span>
+                    </div>
                 )}
 
-                {/* Cinematic Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-80" />
+                {/* Ambient Glow */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-accent-primary/20 mix-blend-overlay pointer-events-none" />
 
-                {/* Hover Actions Overlay - Optimized for Touch */}
-                <div
-                    className={clsx(
-                        "absolute inset-0 flex flex-col items-center justify-center gap-3 sm:gap-4 bg-black/60 backdrop-blur-sm transition-opacity duration-300",
-                        isHovered ? "opacity-100" : "opacity-0"
-                    )}
-                >
-                    <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="absolute inset-0 z-0" />
+                {/* Vignette & Gradients */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.6)_100%)] pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90 transition-opacity duration-500 group-hover:opacity-100" />
+                <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] pointer-events-none" />
 
-                    <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="relative z-10">
-                        <div className="flex gap-4">
-                            <button className="text-white hover:text-accent-primary transition-colors">
-                                <PlayCircle size={32} className="sm:w-[40px] sm:h-[40px] drop-shadow-lg" />
-                            </button>
+                <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-inset" />
+
+                {/* Hover UI */}
+                <div className="absolute inset-0 flex flex-col justify-center items-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                    <PlayCircle size={48} className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500 delay-100" />
+                </div>
+
+                {/* Default Visible Metadata */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none transform transition-transform duration-500 group-hover:-translate-y-12">
+                    {rating !== null && rating > 0 && (
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <Star size={12} className="text-accent-primary fill-accent-primary" />
+                            <span className="text-white text-xs font-bold drop-shadow-md">{rating.toFixed(1)}</span>
                         </div>
-                    </Link>
+                    )}
+                    <h3 className="text-white font-display font-semibold text-base sm:text-lg leading-tight line-clamp-2 drop-shadow-md">
+                        {title}
+                    </h3>
+                    {year && <p className="text-text-secondary text-xs sm:text-sm mt-0.5 drop-shadow-md">{year}</p>}
+                </div>
 
-                    <div className="flex gap-2 text-white relative z-10 flex-wrap justify-center px-2 sm:px-4">
+                {/* Hover Reveal Actions */}
+                <div className="absolute bottom-0 left-0 right-0 p-4 z-30 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-between pointer-events-auto bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
+                    <div className="flex gap-2">
                         <button
-                            onClick={handleWatchlist}
+                            onClick={(e) => handleAction(e, () => isWatchlisted ? remove(movie.id, type) : add({ ...movie, type }))}
                             className={clsx(
-                                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[10px] sm:text-xs font-medium transition-all backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white",
-                                isWatchlisted
-                                    ? "bg-accent-primary/80 border-accent-primary text-white"
-                                    : "bg-black/30 hover:bg-accent-primary hover:border-transparent border-white/20"
+                                "p-2 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
+                                isWatchlisted ? "bg-accent-primary border-accent-primary text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
                             aria-label={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
                         >
-                            {isWatchlisted ? <Check size={12} /> : <Plus size={12} />}
-                            {isWatchlisted ? "Added" : "Watchlist"}
+                            {isWatchlisted ? <Check size={16} /> : <Plus size={16} />}
                         </button>
                         <button
-                            onClick={handleWatched}
-                            title={isWatched ? "Mark as Unwatched" : "Mark as Watched"}
+                            onClick={(e) => handleAction(e, () => isWatched ? removeWatched(movie.id, type) : addWatched({ ...movie, type }))}
                             className={clsx(
-                                "p-1.5 rounded-full border text-xs font-medium transition-all backdrop-blur-md focus-visible:ring-2 focus-visible:ring-white",
-                                isWatched
-                                    ? "bg-green-600/80 border-green-600 text-white"
-                                    : "bg-black/30 hover:bg-green-600 hover:border-transparent border-white/20"
+                                "p-2 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
+                                isWatched ? "bg-green-600 border-green-600 text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
-                            aria-label={isWatched ? "Mark as unwatched" : "Mark as watched"}
+                            aria-label={isWatched ? "Mark unwatched" : "Mark watched"}
                         >
-                            {isWatched ? <Eye size={12} /> : <EyeOff size={12} />}
+                            {isWatched ? <Eye size={16} /> : <EyeOff size={16} />}
                         </button>
                     </div>
-
-                    <div className="relative z-10 flex items-center gap-1 rounded-full border border-white/10 bg-black/35 px-2 py-1.5 backdrop-blur-md">
-                        {QUICK_RATING_SCORES.map((score) => (
-                            <button
-                                key={score}
-                                type="button"
-                                onClick={(event) => handleQuickRating(event, score)}
-                                className={clsx(
-                                    "h-6 w-6 rounded-full flex items-center justify-center transition-colors focus-visible:ring-2 focus-visible:ring-white",
-                                    score <= personalScore
-                                        ? "text-accent-primary"
-                                        : "text-white/55 hover:text-white"
-                                )}
-                                aria-label={personalScore === score ? `Remove ${score} out of 10 rating` : `Rate ${score} out of 10`}
-                                title={personalScore === score ? "Remove rating" : `Rate ${score}/10`}
-                            >
-                                <Star size={13} fill={score <= personalScore ? "currentColor" : "none"} />
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Title & Metadata */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 transform transition-transform duration-300 group-hover:translate-y-2 pointer-events-none">
-                <h3 className="text-white font-display font-medium text-sm sm:text-base lg:text-lg truncate drop-shadow-md">
-                    {title}
-                </h3>
-                <div className="flex items-center gap-2 mt-1">
-                    {rating !== null && (
-                        <span className="text-accent-primary text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded bg-accent-primary/10 border border-accent-primary/20">
-                            {(rating * 10).toFixed(0)}% Match
-                        </span>
-                    )}
-                    <span className="text-text-muted text-[10px] sm:text-xs">
-                        {year}
-                    </span>
+                    <Link
+                        href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`}
+                        className="p-2 rounded-full bg-white/10 border border-white/20 text-white backdrop-blur-md hover:bg-white/20 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none"
+                    >
+                        <Info size={16} />
+                    </Link>
                 </div>
             </div>
         </motion.div>

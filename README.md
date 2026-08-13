@@ -31,6 +31,7 @@ A modern Next.js movie catalogue application powered by **TMDB**, with Clerk aut
 - **Clerk** - User authentication
 - **TMDB API** - Movie, TV, trailer, cast, provider, and collection data
 - **OMDB API** - Optional enrichment and fallback metadata
+- **FM-DB API** - Optional IMDb poster and trailer fallback
 - **Axios** - HTTP client
 
 ## Getting Started
@@ -128,6 +129,7 @@ Add environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_TMDB_API_KEY`
 - `NEXT_PUBLIC_OMDB_API_KEY` (optional)
+- FM-DB does not require an API key; it is used automatically as an optional fallback
 - `CLERK_SECRET_KEY` (optional, only for Clerk server-side auth/proxy features)
 
 ### Build for Production
