@@ -3,3 +3,8 @@
 node_modules/
 venv/
 ml/data/
+
+# Private training exports and generated Python files
+ml/private/
+__pycache__/
+*.py[cod]
