@@ -144,3 +144,18 @@ textarea:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+/* Touch and keyboard access across discovery and account screens. */
+button, select, summary { min-height: 44px; }
+input[type="checkbox"] { min-width: 24px; min-height: 24px; accent-color: var(--accent-primary); }
+input, textarea, select { max-width: 100%; }
+button { touch-action: manipulation; }
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 200; padding: 12px 20px; background: white; color: black; transform: translateY(-160%); }
+.skip-link:focus { transform: translateY(0); }
+dialog::backdrop { background: rgba(0,0,0,.6); }
+@media (max-width: 1023px) {
+  #main-content { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 639px) {
+  .container { padding-left: 1rem; padding-right: 1rem; }
+  input:not([type="checkbox"]):not([type="range"]), select, textarea { font-size: 16px; }
+}

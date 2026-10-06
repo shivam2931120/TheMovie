@@ -1,25 +1,30 @@
 "use client";
 
-import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Loader2, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import {
     getDiscoverMovies,
     getDiscoverTV,
     getMovieGenres,
+    getMovieDetails,
     getMovieSummaries,
     getMovieWatchProviderList,
     getTVGenres,
+    getTVDetails,
     getTVWatchProviderList,
+    getWatchProviders,
     searchMovies,
     searchMulti,
     searchPeople,
     searchTV,
 } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
+import { WatchedContext } from "@/context/WatchedContext";
+import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
+import { LANGUAGES, REGIONS, readSearchState, readSearchPage, searchUrl, type SearchState, type ContentType, type PersonRole } from "@/lib/searchState";
 
-type ContentType = "all" | "movie" | "tv";
-type PersonRole = "cast" | "director";
 type SearchResult = {
     id: number;
     title?: string;
@@ -34,25 +39,79 @@ const MAX_RECOMMENDATION_SEEDS = 8;
 const MAX_SEARCH_RECOMMENDATIONS = 10;
 const SEARCH_SIGNAL_STORAGE_KEY = "themovie_recent_search_signals";
 
-const LANGUAGES = [
-    { code: "", label: "Any language" },
-    { code: "en", label: "English" },
-    { code: "hi", label: "Hindi" },
-    { code: "es", label: "Spanish" },
-    { code: "fr", label: "French" },
-    { code: "ja", label: "Japanese" },
-    { code: "ko", label: "Korean" },
-    { code: "ta", label: "Tamil" },
-    { code: "te", label: "Telugu" },
-];
-
-const REGIONS = ["IN", "US", "GB", "CA", "AU", "DE", "FR", "JP", "KR"];
+const RECENT_SEARCHES_KEY = "themovie_recent_searches";
+type RecentSearch = { label: string; url: string };
 
 function normalizeResult(item: any, type: "movie" | "tv") {
     return {
         ...item,
         type,
     };
+}
+
+async function applyTitleSearchFilters(
+    candidates: SearchResult[],
+    filters: { genre: string; year: string; language: string; minRating: string; runtimeMax: string; provider: string; region: string; personId: number | null; personRole: PersonRole },
+    signal?: AbortSignal
+) {
+    const narrowed = candidates.filter((item: any) => {
+        const date = item.release_date || item.first_air_date || "";
+        if (filters.genre && !(item.genre_ids || []).includes(Number(filters.genre))) return false;
+        if (filters.year && date.slice(0, 4) !== filters.year) return false;
+        if (filters.language && item.original_language !== filters.language) return false;
+        if (filters.minRating && Number(item.vote_average || 0) < Number(filters.minRating)) return false;
+        return true;
+    });
+
+    if (!filters.runtimeMax && !filters.provider && !filters.personId) return narrowed;
+
+    const matched: SearchResult[] = [];
+    let nextIndex = 0;
+    const worker = async () => {
+        while (nextIndex < narrowed.length && !signal?.aborted) {
+            const item = narrowed[nextIndex++];
+            try {
+                const details = item.type === "movie"
+                    ? await getMovieDetails(item.id)
+                    : await getTVDetails(item.id);
+                if (signal?.aborted) return;
+                if (!details?.id) continue;
+
+                if (filters.runtimeMax) {
+                    const runtimes = item.type === "movie"
+                        ? [Number(details.runtime)].filter((runtime) => runtime > 0)
+                        : (details.episode_run_time || []).map(Number).filter((runtime: number) => runtime > 0);
+                    if (!runtimes.length || !runtimes.some((runtime: number) => runtime <= Number(filters.runtimeMax))) continue;
+                }
+
+                if (filters.personId) {
+                    const credits = details.credits || details.aggregate_credits || {};
+                    const cast = credits.cast || [];
+                    const crew = credits.crew || [];
+                    const isCast = cast.some((person: any) => Number(person.id) === filters.personId);
+                    const isDirector = item.type === "movie"
+                        ? crew.some((person: any) => Number(person.id) === filters.personId && person.job === "Director")
+                        : (details.created_by || []).some((person: any) => Number(person.id) === filters.personId)
+                            || crew.some((person: any) => Number(person.id) === filters.personId);
+                    if (filters.personRole === "cast" ? !isCast : !isDirector) continue;
+                }
+
+                if (filters.provider) {
+                    const providerData = await getWatchProviders(item.id, item.type);
+                    const regionData = providerData?.results?.[filters.region];
+                    const regionProviders = ["flatrate", "free", "ads", "rent", "buy"]
+                        .flatMap((group) => regionData?.[group] || []);
+                    if (!regionProviders.some((available: any) => String(available.provider_id) === filters.provider)) continue;
+                }
+                matched.push(item);
+            } catch {
+                // Ignore individual titles that TMDB cannot enrich.
+            }
+        }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(4, narrowed.length) }, worker));
+    return narrowed.filter((item) => matched.some((candidate) => candidate.id === item.id && candidate.type === item.type));
 }
 
 function isAbortError(error: unknown) {
@@ -75,14 +134,14 @@ function getMovieResultIds(results: SearchResult[]) {
     return ids;
 }
 
-function storeSearchSignal(query: string, results: SearchResult[]) {
+function storeSearchSignal(query: string, results: SearchResult[], storageKey: string) {
     if (typeof window === "undefined") return;
 
     const movieIds = getMovieResultIds(results);
     if (movieIds.length === 0 && !query.trim()) return;
 
     try {
-        const existing = JSON.parse(localStorage.getItem(SEARCH_SIGNAL_STORAGE_KEY) || "[]");
+        const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
         const nextSignal = {
             query: query.trim(),
             movieIds,
@@ -92,7 +151,7 @@ function storeSearchSignal(query: string, results: SearchResult[]) {
             nextSignal,
             ...(Array.isArray(existing) ? existing : []).filter((item: any) => item?.query !== nextSignal.query),
         ].slice(0, 10);
-        localStorage.setItem(SEARCH_SIGNAL_STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(storageKey, JSON.stringify(next));
         window.dispatchEvent(new Event("themovie-search-signals"));
     } catch {
         // Search history is an optional personalization signal.
@@ -101,7 +160,28 @@ function storeSearchSignal(query: string, results: SearchResult[]) {
 
 function SearchContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
+    const { user, isLoaded } = useUser();
+    const owner = isLoaded ? user?.id || "guest" : null;
+    const ownerRef = useRef(owner);
+    useLayoutEffect(() => { ownerRef.current = owner; }, [owner]);
+    const recentStorageKey = owner && owner !== "guest" ? `${RECENT_SEARCHES_KEY}:${owner}` : RECENT_SEARCHES_KEY;
+    const signalStorageKey = owner && owner !== "guest" ? `${SEARCH_SIGNAL_STORAGE_KEY}:${owner}` : SEARCH_SIGNAL_STORAGE_KEY;
+    const [viewOwner, setViewOwner] = useState<string | null>(null);
+    const { watched } = useContext(WatchedContext) as any;
+    const { isAllowed } = useRecommendationPreferences();
+    const urlParams = searchParams.toString();
     const queryParam = searchParams.get("q") || "";
+    const requestRef = useRef<AbortController | null>(null);
+    const preserveDraftUrl = useRef<string | null>(null);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [activeSearch, setActiveSearch] = useState<SearchState | null>(null);
+    const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
+    const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
+    const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+    const [activeSuggestion, setActiveSuggestion] = useState(-1);
+    const [shareStatus, setShareStatus] = useState("");
     const [query, setQuery] = useState(queryParam);
     const [contentType, setContentType] = useState<ContentType>("all");
     const [person, setPerson] = useState("");
@@ -119,13 +199,36 @@ function SearchContent() {
     const [results, setResults] = useState<any[]>([]);
     const [searchRecommendations, setSearchRecommendations] = useState<any[]>([]);
     const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+    const visibleRecommendations = useMemo(() => searchRecommendations.filter((item) => isAllowed(item, watched)), [searchRecommendations, isAllowed, watched]);
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(Boolean(queryParam));
     const [error, setError] = useState("");
 
     useEffect(() => {
-        setQuery(queryParam);
-    }, [queryParam]);
+        setRecentSearches([]);
+        preserveDraftUrl.current = null;
+        if (!owner) return;
+        try {
+            const history = JSON.parse(localStorage.getItem(recentStorageKey) || "[]");
+            setRecentSearches(Array.isArray(history) ? history.filter((item) => typeof item?.label === "string" && typeof item?.url === "string" && (item.url === "/search" || item.url.startsWith("/search?"))).slice(0, 8) : []);
+        } catch { /* History is optional. */ }
+    }, [owner, recentStorageKey]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setSuggestions([]);
+        setActiveSuggestion(-1);
+        if (!owner || query.trim().length < 2) return;
+        const timer = setTimeout(async () => {
+            const data = contentType === "movie" ? await searchMovies(query.trim())
+                : contentType === "tv" ? await searchTV(query.trim()) : await searchMulti(query.trim());
+            if (cancelled) return;
+            setSuggestions((data?.results || [])
+                .filter((item: any) => contentType !== "all" || item.media_type === "movie" || item.media_type === "tv")
+                .slice(0, 6).map((item: any) => normalizeResult(item, contentType === "all" ? item.media_type : contentType)));
+        }, 300);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [query, contentType, owner]);
 
     useEffect(() => {
         let isMounted = true;
@@ -178,8 +281,6 @@ function SearchContent() {
         return [...genreMap.values()].sort((a, b) => a.name.localeCompare(b.name));
     }, [contentType, movieGenres, tvGenres]);
 
-    const hasAdvancedFilters = Boolean(person.trim() || genre || year || language || minRating || runtimeMax || provider);
-
     const loadSearchRecommendations = useCallback(async (
         searchQuery: string,
         sourceResults: SearchResult[],
@@ -216,7 +317,7 @@ function SearchContent() {
                     .filter((id: number) => Number.isInteger(id) && id > 0)
                 : [];
 
-            const visibleMovieIds = new Set(movieIds);
+            const visibleMovieIds = new Set(sourceResults.filter((item) => item.type === "movie").map((item) => item.id));
             const uniqueRecIds = [...new Set(recIds)]
                 .filter((id) => !visibleMovieIds.has(id))
                 .slice(0, MAX_SEARCH_RECOMMENDATIONS);
@@ -234,7 +335,7 @@ function SearchContent() {
                     .map((movie: any) => ({ ...movie, type: "movie" }))
             );
         } catch (recommendationError) {
-            if (!isAbortError(recommendationError)) {
+            if (!signal?.aborted && !isAbortError(recommendationError)) {
                 console.warn("Search recommendations failed:", recommendationError);
                 setSearchRecommendations([]);
             }
@@ -243,150 +344,154 @@ function SearchContent() {
         }
     }, []);
 
-    const runSearch = useCallback(async (searchQuery = query) => {
+    const runSearch = useCallback(async (state: SearchState, nextPage: number, signal: AbortSignal) => {
+        if (!owner || signal.aborted || ownerRef.current !== owner) return;
+        const isCurrent = () => !signal.aborted && ownerRef.current === owner;
+        const { q: searchQuery, type: contentType, person, role: personRole, genre, year, language,
+            rating: minRating, runtime: runtimeMax, provider, region } = state;
         const trimmedQuery = searchQuery.trim();
+        const hasAdvancedFilters = Boolean(person.trim() || genre || year || language || minRating || runtimeMax || provider);
+        setSearchRecommendations([]);
+        setRecommendationsLoading(false);
+        setTotalPages(0);
+        setError("");
         if (!trimmedQuery && !hasAdvancedFilters) {
             setResults([]);
-            setSearchRecommendations([]);
-            setRecommendationsLoading(false);
             setSearched(false);
+            setLoading(false);
             return;
         }
-
         setLoading(true);
-        setError("");
         setSearched(true);
-
         try {
             let personId: number | null = null;
             if (person.trim()) {
                 const personData = await searchPeople(person.trim());
+                if (!isCurrent()) return;
                 personId = personData?.results?.[0]?.id || null;
                 if (!personId) {
                     setResults([]);
-                    setSearchRecommendations([]);
-                    setRecommendationsLoading(false);
                     setError("No matching person was found.");
                     return;
                 }
             }
-
             const types: Array<"movie" | "tv"> = contentType === "all" ? ["movie", "tv"] : [contentType];
-            let nextResults: any[] = [];
-
+            let nextResults: SearchResult[] = [];
+            let availablePages = 0;
             if (!hasAdvancedFilters && trimmedQuery && contentType === "all") {
-                const data = await searchMulti(trimmedQuery);
+                const data = await searchMulti(trimmedQuery, nextPage);
+                availablePages = Number(data?.total_pages || 0);
                 nextResults = (data?.results || [])
                     .filter((item: any) => item.media_type === "movie" || item.media_type === "tv")
                     .map((item: any) => normalizeResult(item, item.media_type));
             } else {
-                const perTypeResults = await Promise.all(types.map(async (type) => {
-                    if (!hasAdvancedFilters && trimmedQuery) {
-                        const data = type === "movie" ? await searchMovies(trimmedQuery) : await searchTV(trimmedQuery);
-                        return (data?.results || []).map((item: any) => normalizeResult(item, type));
+                const pages = await Promise.all(types.map(async (type) => {
+                    if (trimmedQuery) {
+                        const data = type === "movie" ? await searchMovies(trimmedQuery, nextPage) : await searchTV(trimmedQuery, nextPage);
+                        return { pages: Number(data?.total_pages || 0), items: (data?.results || []).map((item: any) => normalizeResult(item, type)) };
                     }
-
-                    const filters: Record<string, string | number> = {
-                        sort_by: "popularity.desc",
-                        "vote_count.gte": 10,
-                    };
-
+                    const filters: Record<string, string | number> = { sort_by: "popularity.desc", "vote_count.gte": 10 };
                     if (genre) filters.with_genres = genre;
                     if (language) filters.with_original_language = language;
                     if (minRating) filters["vote_average.gte"] = minRating;
                     if (runtimeMax) filters["with_runtime.lte"] = runtimeMax;
-                    if (provider) {
-                        filters.with_watch_providers = provider;
-                        filters.watch_region = region;
-                    }
-                    if (personId) {
-                        filters[personRole === "director" ? "with_crew" : "with_cast"] = personId;
-                    }
-                    if (year) {
-                        if (type === "movie") {
-                            filters.primary_release_year = year;
-                        } else {
-                            filters.first_air_date_year = year;
-                        }
-                    }
-
-                    const data = type === "movie" ? await getDiscoverMovies(filters) : await getDiscoverTV(filters);
-                    return (data?.results || []).map((item: any) => normalizeResult(item, type));
+                    if (provider) { filters.with_watch_providers = provider; filters.watch_region = region; }
+                    if (personId) filters[personRole === "director" ? "with_crew" : "with_cast"] = personId;
+                    if (year) filters[type === "movie" ? "primary_release_year" : "first_air_date_year"] = year;
+                    const data = type === "movie" ? await getDiscoverMovies(filters, nextPage) : await getDiscoverTV(filters, nextPage);
+                    return { pages: Number(data?.total_pages || 0), items: (data?.results || []).map((item: any) => normalizeResult(item, type)) };
                 }));
-
-                nextResults = perTypeResults.flat();
+                availablePages = Math.max(0, ...pages.map((item) => item.pages));
+                nextResults = pages.flatMap((item) => item.items);
             }
-
+            if (!isCurrent()) return;
             if (trimmedQuery && hasAdvancedFilters) {
-                const lowerQuery = trimmedQuery.toLowerCase();
-                nextResults = nextResults.filter((item) => (item.title || item.name || "").toLowerCase().includes(lowerQuery));
+                nextResults = await applyTitleSearchFilters(nextResults, {
+                    genre, year, language, minRating, runtimeMax, provider, region, personId, personRole,
+                }, signal);
             }
-
-            const deduped = [...new Map(nextResults.map((item) => [`${item.type}-${item.id}`, item])).values()] as SearchResult[];
-            const visibleResults = deduped.filter((item) => item.poster_path || item.backdrop_path);
-            setResults(visibleResults);
-            storeSearchSignal(trimmedQuery, visibleResults);
-            if (contentType === "tv") {
-                setSearchRecommendations([]);
-                setRecommendationsLoading(false);
-            } else {
-                void loadSearchRecommendations(trimmedQuery, visibleResults);
+            if (!isCurrent()) return;
+            const deduped = [...new Map(nextResults.map((item) => [`${item.type}-${item.id}`, item])).values()];
+            setResults(deduped);
+            setTotalPages(Math.min(500, availablePages));
+            if (nextPage === 1) {
+                storeSearchSignal(trimmedQuery, deduped, signalStorageKey);
+                const label = [trimmedQuery || person.trim() || "Browse", contentType === "all" ? "" : contentType === "tv" ? "TV" : "Movies", year, minRating ? `${minRating}+ rating` : ""].filter(Boolean).join(" · ");
+                const entry = { label: label.length > 75 ? `${label.slice(0, 72)}…` : label, url: searchUrl(state) };
+                try {
+                    const saved = JSON.parse(localStorage.getItem(recentStorageKey) || "[]");
+                    const history = [entry, ...(Array.isArray(saved) ? saved : []).filter((item: RecentSearch) => item.url !== entry.url)].slice(0, 8);
+                    localStorage.setItem(recentStorageKey, JSON.stringify(history));
+                    setRecentSearches(history);
+                } catch { /* Search still works when storage is unavailable. */ }
             }
+            if (contentType !== "tv") void loadSearchRecommendations(trimmedQuery, deduped, signal);
         } catch (searchError) {
+            if (!isCurrent()) return;
             console.error("Advanced search failed:", searchError);
             setError("Search failed. Please try again.");
             setResults([]);
-            setSearchRecommendations([]);
-            setRecommendationsLoading(false);
         } finally {
-            setLoading(false);
+            if (isCurrent()) setLoading(false);
         }
-    }, [contentType, genre, hasAdvancedFilters, language, loadSearchRecommendations, minRating, person, personRole, provider, query, region, runtimeMax, year]);
+    }, [loadSearchRecommendations, owner, recentStorageKey, signalStorageKey]);
 
     useEffect(() => {
-        if (!queryParam) return;
-        let isMounted = true;
-        const controller = new AbortController();
-
-        async function loadInitialQuery() {
-            setLoading(true);
-            setError("");
-            setSearched(true);
-            try {
-                const data = await searchMulti(queryParam);
-                const items = (data?.results || [])
-                    .filter((item: any) => item.media_type === "movie" || item.media_type === "tv")
-                    .map((item: any) => normalizeResult(item, item.media_type));
-                if (isMounted) {
-                    const visibleResults = items.filter((item: any) => item.poster_path || item.backdrop_path);
-                    setResults(visibleResults);
-                    storeSearchSignal(queryParam, visibleResults);
-                    void loadSearchRecommendations(queryParam, visibleResults, controller.signal);
-                }
-            } catch (initialError) {
-                if (!isAbortError(initialError)) console.error("Initial search failed:", initialError);
-                if (isMounted) {
-                    setError("Search failed. Please try again.");
-                    setResults([]);
-                    setSearchRecommendations([]);
-                    setRecommendationsLoading(false);
-                }
-            } finally {
-                if (isMounted) setLoading(false);
-            }
+        if (!owner) { requestRef.current?.abort(); return; }
+        const params = new URLSearchParams(urlParams);
+        const state = readSearchState(params);
+        const nextPage = readSearchPage(params);
+        // Submitting or paging can finish after further typing. Keep those drafts;
+        // external links, recent searches, and browser history restore their filters.
+        if (preserveDraftUrl.current !== searchUrl(state, nextPage)) {
+            setQuery(state.q); setContentType(state.type); setPerson(state.person); setPersonRole(state.role);
+            setGenre(state.genre); setYear(state.year); setLanguage(state.language); setMinRating(state.rating);
+            setRuntimeMax(state.runtime); setProvider(state.provider); setRegion(state.region);
         }
+        preserveDraftUrl.current = null;
+        setPage(nextPage); setActiveSearch(state); setSuggestions([]); setSuggestionsOpen(false); setShareStatus("");
+        setViewOwner(owner);
+        requestRef.current?.abort();
+        const controller = new AbortController();
+        requestRef.current = controller;
+        void runSearch(state, nextPage, controller.signal);
+        return () => controller.abort();
+    }, [urlParams, runSearch, owner]);
 
-        loadInitialQuery();
-        return () => {
-            isMounted = false;
-            controller.abort();
-        };
-    }, [loadSearchRecommendations, queryParam]);
-
-    const handleSubmit = async (event: FormEvent) => {
-        event.preventDefault();
-        await runSearch(query);
+    const submitSearch = (title = query) => {
+        if (!owner) return;
+        setSuggestionsOpen(false);
+        const state: SearchState = { q: title.trim(), type: contentType, person, role: personRole, genre, year,
+            language, rating: minRating, runtime: runtimeMax, provider, region };
+        const target = searchUrl(state);
+        requestRef.current?.abort();
+        if (target === `/search${urlParams ? `?${urlParams}` : ""}`) {
+            requestRef.current?.abort();
+            const controller = new AbortController();
+            requestRef.current = controller;
+            void runSearch(state, 1, controller.signal);
+        } else {
+            preserveDraftUrl.current = target;
+            router.push(target, { scroll: false });
+        }
     };
+
+    const changePage = (nextPage: number) => {
+        if (!activeSearch) return;
+        const target = searchUrl(activeSearch, nextPage);
+        preserveDraftUrl.current = target;
+        requestRef.current?.abort();
+        router.push(target, { scroll: false });
+    };
+
+    const handleSubmit = (event: FormEvent) => {
+        event.preventDefault();
+        submitSearch();
+    };
+
+    if (!owner || viewOwner !== owner) {
+        return <main className="min-h-screen pt-32 flex items-center justify-center bg-bg-main"><Loader2 aria-label="Loading search" className="animate-spin text-accent-primary" /></main>;
+    }
 
     return (
         <main className="min-h-screen pt-32 sm:pt-36 pb-20 bg-bg-main">
@@ -404,10 +509,40 @@ function SearchContent() {
                                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                                 <input
                                     value={query}
-                                    onChange={(event) => setQuery(event.target.value)}
+                                    onChange={(event) => { setQuery(event.target.value); setSuggestionsOpen(true); }}
+                                    onFocus={() => setSuggestionsOpen(true)}
+                                    onBlur={() => setSuggestionsOpen(false)}
+                                    role="combobox"
+                                    aria-autocomplete="list"
+                                    aria-expanded={suggestionsOpen && suggestions.length > 0}
+                                    aria-controls="title-suggestions"
+                                    aria-activedescendant={suggestionsOpen && activeSuggestion >= 0 ? `title-suggestion-${activeSuggestion}` : undefined}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Escape") { setSuggestionsOpen(false); return; }
+                                        if (!suggestionsOpen || !suggestions.length) return;
+                                        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                                            event.preventDefault();
+                                            setActiveSuggestion((current) => (current + (event.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length);
+                                        } else if (event.key === "Enter" && activeSuggestion >= 0) {
+                                            event.preventDefault();
+                                            const title = suggestions[activeSuggestion].title || suggestions[activeSuggestion].name || "";
+                                            setQuery(title); submitSearch(title);
+                                        }
+                                    }}
                                     placeholder="Movie or TV title"
                                     className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-10 pr-4 text-sm text-white placeholder:text-text-muted focus:border-accent-primary focus:outline-none"
                                 />
+                                {suggestionsOpen && suggestions.length > 0 && (
+                                    <ul id="title-suggestions" role="listbox" aria-label="Title suggestions" className="absolute z-30 mt-2 w-full rounded-xl border border-white/20 bg-bg-card shadow-xl overflow-hidden">
+                                        {suggestions.map((item, index) => (
+                                            <li key={`${item.type}-${item.id}`} id={`title-suggestion-${index}`} role="option" aria-selected={activeSuggestion === index}
+                                                onMouseDown={(event) => { event.preventDefault(); const title = item.title || item.name || ""; setQuery(title); submitSearch(title); }}
+                                                className={`cursor-pointer px-4 py-3 text-sm text-white hover:bg-white/10 ${activeSuggestion === index ? "bg-white/10" : ""}`}>
+                                                {item.title || item.name} <span className="text-text-muted">· {item.type === "tv" ? "TV" : "Movie"}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         </label>
 
@@ -553,21 +688,14 @@ function SearchContent() {
                         <button
                             type="button"
                             onClick={() => {
-                                setQuery("");
-                                setContentType("all");
-                                setPerson("");
-                                setPersonRole("cast");
-                                setGenre("");
-                                setYear("");
-                                setLanguage("");
-                                setMinRating("");
-                                setRuntimeMax("");
-                                setProvider("");
-                                setResults([]);
-                                setSearchRecommendations([]);
-                                setRecommendationsLoading(false);
-                                setSearched(false);
-                                setError("");
+                                requestRef.current?.abort();
+                                preserveDraftUrl.current = null;
+                                router.push("/search", { scroll: false });
+                                setQuery(""); setContentType("all"); setPerson(""); setPersonRole("cast");
+                                setGenre(""); setYear(""); setLanguage(""); setMinRating("");
+                                setRuntimeMax(""); setProvider(""); setRegion("IN"); setResults([]);
+                                setSearchRecommendations([]); setRecommendationsLoading(false);
+                                setSearched(false); setError(""); setLoading(false); setTotalPages(0); setSuggestionsOpen(false);
                             }}
                             className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-text-secondary transition-all hover:text-white"
                         >
@@ -576,7 +704,50 @@ function SearchContent() {
                     </div>
                 </form>
 
-                {(recommendationsLoading || searchRecommendations.length > 0) && (
+                {searched && activeSearch && (
+                    <div className="mb-5 flex flex-wrap items-center gap-3">
+                        <button type="button" className="rounded-xl border border-white/10 px-4 py-2 text-sm text-white hover:bg-white/10" onClick={async () => {
+                            try {
+                                await navigator.clipboard.writeText(`${window.location.origin}${searchUrl(activeSearch, page)}`);
+                                setShareStatus("Search link copied.");
+                            } catch { setShareStatus("Copy the address from your browser to share this search."); }
+                        }}>Copy search link</button>
+                        <span role="status" className="text-sm text-text-secondary">{shareStatus}</span>
+                    </div>
+                )}
+
+                {recentSearches.length > 0 && (
+                    <section aria-label="Recent searches" className="mb-8 flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-text-secondary">Recent searches:</span>
+                        {recentSearches.map((entry) => (
+                            <button type="button" key={entry.url} onClick={() => {
+                                const params = new URL(entry.url, window.location.origin).searchParams;
+                                const state = readSearchState(params);
+                                const target = searchUrl(state);
+                                preserveDraftUrl.current = null;
+                                if (target === searchUrl(readSearchState(new URLSearchParams(urlParams)), page)) {
+                                    setQuery(state.q); setContentType(state.type); setPerson(state.person); setPersonRole(state.role);
+                                    setGenre(state.genre); setYear(state.year); setLanguage(state.language); setMinRating(state.rating);
+                                    setRuntimeMax(state.runtime); setProvider(state.provider); setRegion(state.region);
+                                    requestRef.current?.abort();
+                                    const controller = new AbortController(); requestRef.current = controller;
+                                    void runSearch(state, 1, controller.signal);
+                                } else router.push(target, { scroll: false });
+                            }}
+                                title={entry.url} className="rounded-full border border-white/10 px-3 py-2 text-sm text-white hover:bg-white/10">{entry.label}</button>
+                        ))}
+                        <button type="button" className="px-3 py-2 text-sm text-text-secondary hover:text-white" onClick={() => {
+                            setRecentSearches([]);
+                            try {
+                                localStorage.removeItem(recentStorageKey);
+                                localStorage.removeItem(signalStorageKey);
+                                window.dispatchEvent(new Event("themovie-search-signals"));
+                            } catch { /* Optional storage. */ }
+                        }}>Clear history</button>
+                    </section>
+                )}
+
+                {(recommendationsLoading || visibleRecommendations.length > 0) && (
                     <section className="mb-10">
                         <div className="mb-5 flex items-center gap-2">
                             <div className="rounded-lg bg-accent-primary/20 p-1.5">
@@ -593,8 +764,8 @@ function SearchContent() {
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-y-10 sm:gap-y-12 gap-x-3 sm:gap-x-6">
-                                {searchRecommendations.map((item) => (
-                                    <MovieCard key={`search-rec-${item.id}`} movie={item} />
+                                {visibleRecommendations.map((item) => (
+                                    <MovieCard key={`search-rec-${item.id}`} movie={item} recommendation reason="Related to your search" />
                                 ))}
                             </div>
                         )}
@@ -629,6 +800,18 @@ function SearchContent() {
                         <p className="text-white text-lg font-bold mb-1">Start a Search</p>
                         <p className="text-text-secondary">Use a title or any advanced filter.</p>
                     </div>
+                )}
+                {searched && !loading && totalPages > 1 && activeSearch && (
+                    <nav aria-label="Search result pages" className="mt-10 flex items-center justify-center gap-4">
+                        <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)}
+                            className="rounded-xl border border-white/10 px-4 py-3 text-white disabled:opacity-40">Previous</button>
+                        <span className="text-sm text-text-secondary">Page {page} of {totalPages}</span>
+                        <button type="button" disabled={page >= totalPages} onClick={() => changePage(page + 1)}
+                            className="rounded-xl border border-white/10 px-4 py-3 text-white disabled:opacity-40">Next</button>
+                    </nav>
+                )}
+                {searched && activeSearch?.q && Boolean(activeSearch.genre || activeSearch.year || activeSearch.language || activeSearch.rating || activeSearch.runtime || activeSearch.provider || activeSearch.person) && (
+                    <p className="mt-4 text-center text-sm text-text-muted">Filters apply to each page of title matches. A later page may contain more matching titles.</p>
                 )}
             </div>
         </main>

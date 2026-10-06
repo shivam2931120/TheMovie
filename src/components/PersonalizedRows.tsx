@@ -2,13 +2,16 @@
 
 import { useEffect, useState, useContext } from 'react';
 import { MovieRow } from './MovieRow';
-import { getDiscoverMovies, getMovieRecommendations, getMovieSummaries, getTVRecommendations } from '@/api/tmdb';
-import { RecentlyViewedContext } from '@/context/RecentlyViewedContext';
-import { WatchlistContext } from '@/context/watchlist-context';
+import { getDiscoverMovies, getMovieRecommendations, getTVRecommendations } from '@/api/tmdb';
 import { WatchedContext } from '@/context/WatchedContext';
-import { useLists } from '@/context/ListsContext';
 import { useRatings } from '@/context/ReviewContext';
 import { useUser } from '@clerk/nextjs';
+import { useRecommendationProfile } from '@/lib/useRecommendationProfile';
+import { personalizedTV } from "@/lib/tvPersonalization";
+import { useProfilePreferences } from "@/context/ProfilePreferencesContext";
+import { RecommendationSettings } from './RecommendationSettings';
+import { personalizedMovies } from '@/lib/moviePersonalization';
+import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
 
 // GENRE_MAP for profile favourite-genre → TMDB genre ID
 const GENRE_ID_MAP: Record<string, number> = {
@@ -44,33 +47,60 @@ const uniqueMovieIds = (ids: Array<number | null>, limit = MAX_SIGNAL_IDS) => {
 const isMovieItem = (item: any) => item?.type === 'movie' || (!item?.type && !item?.name);
 const hasCardData = (item: any) => item?.id && item?.poster_path && (item.title || item.name);
 const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
+const tagSimilar=(items:any[])=>{
+    const requestId=crypto.randomUUID();
+    return items.map(item=>({...item,recommendationModel:'tmdb-similar-v1',recommendationRequestId:requestId}));
+};
 
 export function PersonalizedRows() {
+    const {user,isLoaded}=useUser();
+    return <PersonalizedRowsForAccount key={isLoaded?(user?.id||'guest'):'loading'}/>;
+}
+
+function PersonalizedRowsForAccount() {
+    const [loading,setLoading]=useState(true);
+    const [tvLoading,setTvLoading]=useState(true);
     const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+    const [tvRow,setTvRow] = useState<any[]>([]);
+    const tvProfile=useRecommendationProfile("tv");
+    const tvProfileJson = JSON.stringify(tvProfile);
     const [genreRow, setGenreRow] = useState<any[]>([]);
     const [genreRowTitle, setGenreRowTitle] = useState("");
     const [becauseYouWatchedRow, setBecauseYouWatchedRow] = useState<any[]>([]);
     const [becauseTitle, setBecauseTitle] = useState("");
     const [becauseYouRatedRow, setBecauseYouRatedRow] = useState<any[]>([]);
     const [becauseRatedTitle, setBecauseRatedTitle] = useState("");
-    const [searchSignals, setSearchSignals] = useState<any[]>([]);
+    const [signalState, setSignalState] = useState<{ owner: string; entries: any[] }>({ owner: "", entries: [] });
 
-    const { recentlyViewed } = useContext(RecentlyViewedContext) as any;
-    const { items: watchlistItems } = useContext(WatchlistContext) as any;
     const { watched } = useContext(WatchedContext) as any;
     const { ratings } = useRatings() as any;
-    const { lists } = useLists() as any;
-    const { user, isSignedIn } = useUser();
+    const { user, isSignedIn, isLoaded } = useUser();
+    const signalStorageKey = isSignedIn && user ? `${SEARCH_SIGNAL_STORAGE_KEY}:${user.id}` : SEARCH_SIGNAL_STORAGE_KEY;
+    const searchSignals = signalState.owner === signalStorageKey ? signalState.entries : null;
+    const { preferences: profilePreferences } = useProfilePreferences();
+    const movieProfile=useRecommendationProfile();
+    const profileJson = JSON.stringify(movieProfile);
+    const {isAllowed}=useRecommendationPreferences();
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        const controller=new AbortController();
+        setTvRow([]);
+        if (!isLoaded) return;
+        setTvLoading(true);
+        void personalizedTV(JSON.parse(tvProfileJson),controller.signal).then(items=>{if(!controller.signal.aborted)setTvRow(items);}).catch(()=>{}).finally(()=>{if(!controller.signal.aborted)setTvLoading(false);});
+        return ()=>controller.abort();
+    },[tvProfileJson,isLoaded]);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !isLoaded) return;
 
         const loadSearchSignals = () => {
             try {
-                const stored = JSON.parse(localStorage.getItem(SEARCH_SIGNAL_STORAGE_KEY) || "[]");
-                setSearchSignals(Array.isArray(stored) ? stored : []);
+                const stored = JSON.parse(localStorage.getItem(signalStorageKey) || "[]");
+                const entries=Array.isArray(stored)?stored:[];
+                setSignalState(current=>current.owner===signalStorageKey&&JSON.stringify(current.entries)===JSON.stringify(entries)?current:{owner:signalStorageKey,entries});
             } catch {
-                setSearchSignals([]);
+                setSignalState({ owner: signalStorageKey, entries: [] });
             }
         };
 
@@ -82,17 +112,17 @@ export function PersonalizedRows() {
             window.removeEventListener("themovie-search-signals", loadSearchSignals);
             window.removeEventListener("storage", loadSearchSignals);
         };
-    }, []);
+    }, [signalStorageKey, isLoaded]);
 
     useEffect(() => {
         let isMounted = true;
         const controller = new AbortController();
 
-        const recentItems = Array.isArray(recentlyViewed) ? recentlyViewed : [];
-        const watchlist = Array.isArray(watchlistItems) ? watchlistItems : [];
+
+
         const watchedItems = Array.isArray(watched) ? watched : [];
         const ratingItems = Array.isArray(ratings) ? ratings : [];
-        const customLists = Array.isArray(lists) ? lists : [];
+
         const recentSearchSignals = Array.isArray(searchSignals) ? searchSignals : [];
 
         setAiRecommendations([]);
@@ -102,65 +132,13 @@ export function PersonalizedRows() {
         setBecauseTitle("");
         setBecauseYouRatedRow([]);
         setBecauseRatedTitle("");
-
-        const buildSignalIds = () => {
-            const recentIds = recentItems
-                .filter(isMovieItem)
-                .slice(0, 5)
-                .map((item: any) => toMovieId(item.id));
-
-            const watchlistIds = watchlist
-                .filter(isMovieItem)
-                .slice(0, 5)
-                .map((item: any) => toMovieId(item.id));
-
-            const ratedMovieIds = ratingItems
-                .filter((rating: any) => rating.type === 'movie' && rating.rating >= 7)
-                .slice(0, 5)
-                .map((rating: any) => toMovieId(rating.itemId));
-
-            const listedMovieIds = customLists
-                .flatMap((list: any) => Array.isArray(list.movies) ? list.movies : [])
-                .filter(isMovieItem)
-                .slice(0, 5)
-                .map((item: any) => toMovieId(item.id));
-
-            const searchMovieIds = recentSearchSignals
-                .flatMap((signal: any) => Array.isArray(signal.movieIds) ? signal.movieIds : [])
-                .slice(0, 5)
-                .map((id: any) => toMovieId(id));
-
-            return uniqueMovieIds([...recentIds, ...searchMovieIds, ...watchlistIds, ...ratedMovieIds, ...listedMovieIds]);
-        };
+        if (!isLoaded || searchSignals === null) return () => { isMounted = false; controller.abort(); };
 
         const loadAiRecommendations = async () => {
-            const signalIds = buildSignalIds();
-            const latestSearchQuery = recentSearchSignals.find((signal: any) => typeof signal?.query === "string" && signal.query.trim())?.query || "";
-            if (signalIds.length === 0 && !latestSearchQuery) return [];
-
-            const signalSet = new Set(signalIds);
-            const params = new URLSearchParams();
-            if (signalIds.length > 0) params.set("movieIds", signalIds.join(','));
-            if (latestSearchQuery) params.set("query", latestSearchQuery);
-            const res = await fetch(`/api/ai-recommend?${params.toString()}`, {
-                signal: controller.signal,
-            });
-
-            if (!res.ok) return [];
-
-            const data = await res.json();
-            const recIds = uniqueMovieIds(
-                (Array.isArray(data.recommendations) ? data.recommendations : [])
-                    .map((id: number | string) => toMovieId(id)),
-                MAX_ROW_ITEMS
-            ).filter((id) => !signalSet.has(id));
-
-            if (recIds.length === 0) return [];
-
-            const movies = await getMovieSummaries(recIds, MAX_ROW_ITEMS);
-            return movies
-                .filter(hasCardData)
-                .map((movie: any) => ({ ...movie, type: 'movie' }));
+            const profile = JSON.parse(profileJson);
+            const searchIds = uniqueMovieIds(recentSearchSignals.flatMap((signal: any) => signal.movieIds || []).map(toMovieId), 5);
+            return personalizedMovies({...profile,seeds:[...profile.seeds,...searchIds.map(id=>({id,weight:0.3,source:'search'}))]},controller.signal,undefined,
+                recentSearchSignals.find((signal:any)=>signal?.query?.trim())?.query||'');
         };
 
         const loadBecauseYouWatched = async () => {
@@ -177,7 +155,7 @@ export function PersonalizedRows() {
 
             return {
                 title: movies.length > 0 ? `Because You Watched "${seed.title || seed.name}"` : "",
-                movies,
+                movies:tagSimilar(movies),
             };
         };
 
@@ -204,24 +182,12 @@ export function PersonalizedRows() {
 
             return {
                 title: movies.length > 0 ? `Because You Rated "${title}" ${topRating.rating}/10` : "",
-                movies,
+                movies:tagSimilar(movies),
             };
         };
 
         const loadGenreRow = async () => {
-            const metadataPreferences = user?.unsafeMetadata?.profilePreferences as { favoriteGenres?: string[] } | undefined;
-            let savedGenres: string[] = [];
-
-            if (isSignedIn && Array.isArray(metadataPreferences?.favoriteGenres)) {
-                savedGenres = metadataPreferences.favoriteGenres;
-            } else if (typeof window !== 'undefined') {
-                try {
-                    const parsed = JSON.parse(localStorage.getItem("user_favorite_genres") || "[]");
-                    savedGenres = Array.isArray(parsed) ? parsed : [];
-                } catch {
-                    savedGenres = [];
-                }
-            }
+            const savedGenres = profilePreferences.favoriteGenres;
 
             const pick = savedGenres.find((genre) => typeof genre === "string" && GENRE_ID_MAP[genre]);
             const genreId = pick ? GENRE_ID_MAP[pick] : null;
@@ -243,12 +209,12 @@ export function PersonalizedRows() {
 
             return {
                 title: movies.length > 0 ? `Top ${pick} Movies For You` : "",
-                movies,
+                movies:tagSimilar(movies),
             };
         };
 
         const runTask = (loader: () => Promise<any>, apply: (result: any) => void) => {
-            void loader()
+            return loader()
                 .then((result) => {
                     if (isMounted) apply(result);
                 })
@@ -259,41 +225,61 @@ export function PersonalizedRows() {
                 });
         };
 
-        runTask(loadAiRecommendations, setAiRecommendations);
+        setLoading(true);
+        const tasks=[runTask(loadAiRecommendations, setAiRecommendations),
         runTask(loadBecauseYouWatched, (row) => {
             setBecauseYouWatchedRow(row.movies);
             setBecauseTitle(row.title);
-        });
+        }),
         runTask(loadBecauseYouRated, (row) => {
             setBecauseYouRatedRow(row.movies);
             setBecauseRatedTitle(row.title);
-        });
+        }),
         runTask(loadGenreRow, (row) => {
             setGenreRow(row.movies);
             setGenreRowTitle(row.title);
-        });
+        })];
+        void Promise.allSettled(tasks).then(()=>{if(isMounted)setLoading(false);});
 
         return () => {
             isMounted = false;
             controller.abort();
         };
-    }, [recentlyViewed, watchlistItems, watched, ratings, lists, searchSignals, user, isSignedIn]);
+    }, [watched, ratings, searchSignals, isLoaded, profileJson, profilePreferences]);
 
-    if (aiRecommendations.length === 0 && genreRow.length === 0 && becauseYouWatchedRow.length === 0 && becauseYouRatedRow.length === 0) return null;
 
+    const seen=new Set<string>();
+    const cleanRow=(items:any[],reason?:string)=>{
+      let count=0;
+      return items.filter(item=>{
+        const type=item.type||'movie';const key=`${type}:${item.id}`;
+        if(count>=MAX_ROW_ITEMS||seen.has(key)||!isAllowed(item,watched)||(type==='tv'?tvProfile:movieProfile).exclude.includes(Number(item.id)))return false;
+        seen.add(key);count++;return true;
+      }).map(item=>reason?{...item,recommendationReason:reason,recommendationModel:item.recommendationModel||'tmdb-similar-v1'}:item);
+    };
+    const moviePicks=cleanRow(aiRecommendations);
+    const tvPicks=cleanRow(tvRow);
+    const ratedPicks=cleanRow(becauseYouRatedRow,becauseRatedTitle);
+    const watchedPicks=cleanRow(becauseYouWatchedRow,becauseTitle);
+    const genrePicks=cleanRow(genreRow,genreRowTitle);
     return (
         <>
-            {aiRecommendations.length > 0 && (
-                <MovieRow title="Recommended For You" movies={aiRecommendations} />
+            <div className="container mx-auto px-6 lg:px-20"><RecommendationSettings /></div>
+            {!movieProfile.seeds.length&&!tvProfile.seeds.length&&<p className="container mx-auto px-6 pt-4 text-sm text-text-secondary lg:px-20">Start with popular picks. Rate a few titles or choose your favorite genres in your profile to make these more personal.</p>}
+            {(loading||tvLoading)&&<p role="status" className="container mx-auto px-6 pt-4 text-sm text-text-muted lg:px-20">Updating your picks…</p>}
+            {!loading&&!tvLoading&&!moviePicks.length&&!tvPicks.length&&<p className="container mx-auto px-6 py-6 text-sm text-text-muted lg:px-20">No picks are available right now. Try again later or adjust your hidden titles.</p>}
+            {tvPicks.length > 0 && <MovieRow title="TV picked for you" movies={tvPicks} recommendations />}
+            {moviePicks.length > 0 && (
+                <MovieRow title="Movies picked for you" movies={moviePicks} recommendations />
             )}
             {becauseYouWatchedRow.length > 0 && (
-                <MovieRow title={becauseTitle} movies={becauseYouWatchedRow} />
+                <MovieRow title={becauseTitle} movies={watchedPicks} recommendations />
             )}
             {becauseYouRatedRow.length > 0 && (
-                <MovieRow title={becauseRatedTitle} movies={becauseYouRatedRow} />
+                <MovieRow title={becauseRatedTitle} movies={ratedPicks} recommendations />
             )}
             {genreRow.length > 0 && (
-                <MovieRow title={genreRowTitle} movies={genreRow} />
+                <MovieRow title={genreRowTitle} movies={genrePicks} recommendations />
             )}
         </>
     );

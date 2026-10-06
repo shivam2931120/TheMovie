@@ -1,13 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useUser } from "@clerk/nextjs";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
-import { clearStoredKeys, hasGuestMergeChanges, mergeRatings, readStoredJson } from "@/lib/guestDataMerge";
+import { createContext, useCallback, useContext, useMemo } from "react";
+import { useAccountFeature } from "@/lib/useAccountFeature";
+import { mergeRatings } from "@/lib/guestDataMerge";
 
 const RatingContext = createContext();
-const STORAGE_KEY = "movie_catalogue_ratings_v1";
-const LEGACY_STORAGE_KEYS = ["movie_catalogue_reviews_v2", "userReviews"];
 
 const getItemType = (item, fallback = "movie") => item?.type || (item?.name && !item?.title ? "tv" : fallback);
 const ratingKey = (id, type = "movie") => `${type}:${id}`;
@@ -65,106 +62,14 @@ const normalizeRating = (entry) => {
 
 const normalizeRatings = (entries) => (
     Array.isArray(entries)
-        ? entries.map(normalizeRating).filter((entry) => entry.itemId && entry.rating > 0)
+        ? entries.filter(entry => entry && typeof entry === "object").map(normalizeRating).filter((entry) => entry.itemId && entry.rating > 0)
         : []
 );
 
-function readLocalRatings() {
-    const keys = [STORAGE_KEY, ...LEGACY_STORAGE_KEYS];
-    const ratings = keys.flatMap((key) => normalizeRatings(readStoredJson(key, [])));
-    return mergeRatings([], ratings);
-}
-
-function writeLocalRatings(ratings) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ratings));
-    LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
-}
-
-function clearLocalRatings() {
-    clearStoredKeys([STORAGE_KEY, ...LEGACY_STORAGE_KEYS]);
-}
+const EMPTY = [];
 
 export function ReviewProvider({ children }) {
-    const { user, isSignedIn, isLoaded } = useUser();
-    const [ratings, setRatings] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const initialized = useRef(false);
-    const saveTimeout = useRef(null);
-
-    useEffect(() => {
-        if (!isLoaded) return;
-
-        initialized.current = false;
-        setLoading(true);
-
-        try {
-            if (isSignedIn && user) {
-                const accountRatings = normalizeRatings(user.unsafeMetadata?.ratings || user.unsafeMetadata?.reviews);
-                const guestRatings = readLocalRatings();
-                const mergedRatings = mergeRatings(accountRatings, guestRatings);
-                const hasLegacyReviews = Array.isArray(user.unsafeMetadata?.reviews);
-
-                setRatings(mergedRatings);
-
-                if ((guestRatings.length > 0 && hasGuestMergeChanges(accountRatings, mergedRatings)) || hasLegacyReviews) {
-                    void saveUnsafeMetadata(user, (current) => {
-                        const next = {
-                            ...current,
-                            ratings: mergedRatings,
-                        };
-                        delete next.reviews;
-                        return next;
-                    }).then(() => {
-                        clearLocalRatings();
-                    }).catch((error) => {
-                        console.error("Failed to merge guest ratings into Clerk:", error);
-                    });
-                } else if (guestRatings.length > 0) {
-                    clearLocalRatings();
-                }
-            } else {
-                setRatings(readLocalRatings());
-            }
-        } catch (error) {
-            console.error("Failed to load ratings:", error);
-            setRatings([]);
-        } finally {
-            setLoading(false);
-            setTimeout(() => { initialized.current = true; }, 100);
-        }
-    }, [user, isSignedIn, isLoaded]);
-
-    useEffect(() => {
-        if (!isLoaded || !initialized.current) return;
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-        saveTimeout.current = setTimeout(() => {
-            if (isSignedIn && user) {
-                saveUnsafeMetadata(user, (current) => {
-                    const next = {
-                        ...current,
-                        ratings,
-                    };
-                    delete next.reviews;
-                    return next;
-                }).catch((error) => {
-                    console.error("Failed to save ratings to Clerk:", error);
-                    try {
-                        writeLocalRatings(ratings);
-                    } catch { /* ignore */ }
-                });
-            } else {
-                try {
-                    writeLocalRatings(ratings);
-                } catch { /* ignore */ }
-            }
-        }, 700);
-
-        return () => {
-            if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        };
-    }, [ratings, isSignedIn, user, isLoaded]);
-
+    const { data: ratings, update: setRatings, loading } = useAccountFeature("ratings", EMPTY, mergeRatings, normalizeRatings);
     const upsertRating = useCallback(async (item, rating) => {
         const type = getItemType(item);
         const itemId = item.id;
@@ -195,7 +100,7 @@ export function ReviewProvider({ children }) {
         });
 
         return nextRating;
-    }, []);
+    }, [setRatings]);
 
     const addRating = useCallback(async (movieId, movieTitle, poster, rating, _content, type = "movie") => {
         return upsertRating({ id: movieId, title: movieTitle, poster_path: poster, type }, rating);
@@ -207,15 +112,15 @@ export function ReviewProvider({ children }) {
                 ? normalizeRating({ ...entry, ...updates, content: "", updatedAt: new Date().toISOString() })
                 : entry
         ).filter((entry) => entry.rating > 0));
-    }, []);
+    }, [setRatings]);
 
     const deleteRating = useCallback(async (ratingId) => {
         setRatings((prev) => prev.filter((entry) => entry.id !== ratingId));
-    }, []);
+    }, [setRatings]);
 
     const deleteRatingForItem = useCallback(async (itemId, type = "movie") => {
         setRatings((prev) => prev.filter((entry) => !(String(entry.itemId) === String(itemId) && entry.type === type)));
-    }, []);
+    }, [setRatings]);
 
     const getRatingForItem = useCallback((itemId, type = "movie") => {
         return ratings.find((entry) => String(entry.itemId) === String(itemId) && entry.type === type) || null;

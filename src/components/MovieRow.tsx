@@ -1,19 +1,24 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useContext } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MovieCard } from "./MovieCard";
 import clsx from "clsx";
+import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
+import { WatchedContext } from "@/context/WatchedContext";
 
 interface MovieRowProps {
     title: string;
     movies: any[];
+    recommendations?: boolean;
 }
 
-export function MovieRow({ title, movies }: MovieRowProps) {
+export function MovieRow({ title, movies, recommendations = false }: MovieRowProps) {
     const rowRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
+    const { isAllowed } = useRecommendationPreferences();
+    const { watched } = useContext(WatchedContext) as any;
 
     const checkScrollability = () => {
         if (rowRef.current) {
@@ -33,21 +38,19 @@ export function MovieRow({ title, movies }: MovieRowProps) {
         if (rowRef.current) {
             const { current } = rowRef;
             const scrollAmount = direction === "left" ? -current.offsetWidth + 100 : current.offsetWidth - 100;
-            current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+            current.scrollBy({ left: scrollAmount, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? "auto" : "smooth" });
         }
     };
 
-    if (!movies || movies.length === 0) return null;
-
-    // Use virtualization/lazy limit: render first 20
-    const displayMovies = movies.slice(0, 20);
+    const displayMovies = (movies || []).filter((movie) => !recommendations || isAllowed(movie, watched)).slice(0, 20);
+    if (displayMovies.length === 0) return null;
 
     return (
         <div className="relative py-8 sm:py-12 group/row">
             <div className="container mx-auto px-6 lg:px-20 mb-6 flex items-end justify-between">
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-display font-semibold text-white tracking-tight">{title}</h2>
-                {/* Controls (desktop hover only) */}
-                <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity duration-300">
+                {/* Controls are available to touch and keyboard users. */}
+                <div className="flex items-center gap-2 shrink-0 ml-3">
                     <button
                         onClick={() => scroll("left")}
                         disabled={!canScrollLeft}
@@ -78,12 +81,12 @@ export function MovieRow({ title, movies }: MovieRowProps) {
                     onScroll={checkScrollability}
                     className="flex gap-4 sm:gap-6 overflow-x-auto horizontal-scroll px-6 lg:px-20 snap-x snap-mandatory pb-8 pt-4"
                 >
-                    {displayMovies.map((movie, idx) => (
+                    {displayMovies.map((movie) => (
                         <div 
-                            key={`${movie.type || (movie.name ? "tv" : "movie")}-${movie.id}-${idx}`} 
+                            key={`${movie.type || (movie.name ? "tv" : "movie")}-${movie.id}`}
                             className="snap-start shrink-0 w-[140px] sm:w-[180px] md:w-[220px] lg:w-[260px] will-change-transform"
                         >
-                            <MovieCard movie={movie} />
+                            <MovieCard movie={movie} recommendation={recommendations} reason={movie.recommendationReason || title} />
                         </div>
                     ))}
                 </div>

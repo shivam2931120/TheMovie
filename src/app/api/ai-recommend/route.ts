@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import recommendationsData from '@/data/recommendations.json';
+import feedbackModel from '@/data/feedback-recommendations.json';
 import searchIndexData from '@/data/recommendation-search-index.json';
+import { rankRecommendations, type RecommendationProfile } from '@/lib/recommendationRanker';
+import { blendGraphs,neighborValues,type NeighborGraph } from '@/lib/recommendationGraph';
+import { sanitizeCatalog } from '@/lib/recommendationCatalog';
 
-const recommendations = recommendationsData as Record<string, number[]>;
+const recommendations = blendGraphs({graph:recommendationsData,weight:0.8},{graph:feedbackModel.movie as NeighborGraph,weight:1});
 const MAX_SEED_IDS = 20;
 const MAX_RESULTS = 20;
 const MAX_SEARCH_SEEDS = 8;
 const MAX_SEARCH_CANDIDATES = 16;
 const CACHE_HEADERS = {
-    'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+    'Cache-Control': 'private, no-store',
 };
 
 type SearchEntry = {
@@ -135,78 +139,67 @@ function parseMovieIds(...params: Array<string | null>) {
     return ids;
 }
 
-function recommendationResponse(ids: number[]) {
-    return NextResponse.json(
-        { recommendations: ids },
-        { headers: CACHE_HEADERS }
-    );
+function recommendationResponse(profile: RecommendationProfile,liveCatalog:ReturnType<typeof sanitizeCatalog>=[],liveGraph:NeighborGraph={}) {
+    const catalog=[...new Map([...searchEntries,...liveCatalog].map(entry=>[entry.id,entry])).values()];
+    const seedIds=[...(profile.seeds||[]),...(profile.negatives||[])].filter(seed=>seed).map(seed=>String(seed.id));
+    const relevantGraph=Object.fromEntries(seedIds.map(id=>[id,recommendations[id]||[]]));
+    const graph=blendGraphs({graph:relevantGraph,weight:1},{graph:liveGraph,weight:0.65});
+    const details = rankRecommendations(profile, graph, catalog, MAX_RESULTS);
+    return NextResponse.json({ recommendations: details.map((entry) => entry.id), details, model: "hybrid-profile-v4", requestId: crypto.randomUUID() }, { headers: CACHE_HEADERS });
 }
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-
-    const movieIdParam = searchParams.get('movieId');
-    const movieIdsParam = searchParams.get('movieIds');
-    const resultIdsParam = searchParams.get('resultIds');
-    const queryParam = searchParams.get('query') || '';
-
-    const explicitMovieIds = parseMovieIds(movieIdsParam, movieIdParam);
-    const resultIds = parseMovieIds(resultIdsParam).slice(0, MAX_SEARCH_SEEDS);
-    const searchCandidates = getSearchCandidates(queryParam);
-
-    const seedWeights = new Map<string, number>();
-    const addSeed = (id: string, weight: number) => {
-        seedWeights.set(id, Math.max(seedWeights.get(id) || 0, weight));
-    };
-
-    explicitMovieIds.forEach((id, index) => addSeed(id, 1.25 - Math.min(index, 10) * 0.02));
-    resultIds.forEach((id, index) => addSeed(id, 1.1 - Math.min(index, 8) * 0.04));
-    searchCandidates.slice(0, MAX_SEARCH_SEEDS).forEach((candidate, index) => {
-        addSeed(String(candidate.id), 0.95 - Math.min(index, 8) * 0.03);
+    const explicit = parseMovieIds(searchParams.get('movieIds'), searchParams.get('movieId'));
+    const results = parseMovieIds(searchParams.get('resultIds')).slice(0, MAX_SEARCH_SEEDS);
+    const query = (searchParams.get('query') || '').slice(0, 256);
+    const candidates = getSearchCandidates(query);
+    return recommendationResponse({
+        seeds: [...explicit.map((id) => ({ id: Number(id), weight: 1.25, source: "viewed" })),
+            ...results.map((id) => ({ id: Number(id), weight: 0.75, source: "search" }))],
+        searchCandidates: candidates,
     });
+}
 
-    const movieIds = Array.from(seedWeights.keys()).slice(0, MAX_SEED_IDS);
-
-    if (movieIds.length === 0) {
-        return recommendationResponse([]);
-    }
-
+export async function POST(request: Request) {
+    // Read a bounded body: preference/history requests must never enter shared caches.
+    const reader = request.body?.getReader();
+    if (!reader) return NextResponse.json({ error: "Invalid profile" }, { status: 400, headers: CACHE_HEADERS });
+    let bytes = 0;
+    const chunks: Uint8Array[] = [];
     try {
-        const scores = new Map<number, number>();
-        const seedSet = new Set(movieIds);
-
-        for (const id of movieIds) {
-            const recs = recommendations[id];
-            if (!Array.isArray(recs)) continue;
-            const seedWeight = seedWeights.get(id) || 1;
-
-            recs.forEach((recId, index) => {
-                if (!Number.isInteger(recId) || recId <= 0 || seedSet.has(String(recId))) return;
-
-                const score = seedWeight * (1 + (1 / (index + 1)));
-                scores.set(recId, (scores.get(recId) || 0) + score);
-            });
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            bytes += value.byteLength;
+            if (bytes > 65536) {
+                await reader.cancel();
+                return NextResponse.json({ error: "Profile too large" }, { status: 413, headers: CACHE_HEADERS });
+            }
+            chunks.push(value);
         }
-
-        searchCandidates.forEach((candidate, index) => {
-            if (seedSet.has(String(candidate.id))) return;
-            const directSearchScore = Math.max(candidate.score * 0.25, 0.01) - index * 0.005;
-            scores.set(candidate.id, (scores.get(candidate.id) || 0) + directSearchScore);
-        });
-
-        const sortedRecs = Array.from(scores.entries())
-            .sort(([idA, scoreA], [idB, scoreB]) => scoreB - scoreA || idA - idB)
-            .slice(0, MAX_RESULTS)
-            .map(([id]) => id);
-
-        if (sortedRecs.length === 0) {
-            return recommendationResponse([]);
+        const payload = new Uint8Array(bytes);
+        let offset = 0;
+        for (const chunk of chunks) { payload.set(chunk, offset); offset += chunk.length; }
+        const data = JSON.parse(new TextDecoder().decode(payload));
+        if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid profile");
+        const profile: RecommendationProfile = {
+            seeds: Array.isArray(data.seeds) ? data.seeds.slice(0, 200) : [],
+            negatives: Array.isArray(data.negatives) ? data.negatives.slice(0, 200) : [],
+            exclude: Array.isArray(data.exclude) ? data.exclude.slice(0, 2000) : [],
+            favoriteGenres: Array.isArray(data.favoriteGenres) ? data.favoriteGenres.filter((genre: unknown) => typeof genre === "string").slice(0, 10) : [],
+            exploration: Number(data.exploration),
+            searchCandidates: getSearchCandidates(typeof data.query === "string" ? data.query.slice(0, 256) : ""),
+        };
+        const liveGraph:NeighborGraph={};
+        const seedIds=new Set([...(profile.seeds||[]),...(profile.negatives||[])].filter(seed=>seed&&Number.isSafeInteger(seed.id)).map(seed=>String(seed.id)));
+        if(data.neighbors && typeof data.neighbors==='object' && !Array.isArray(data.neighbors)) {
+            for(const [id,edges] of Object.entries(data.neighbors).slice(0,8)) {
+                if(seedIds.has(id) && Array.isArray(edges))liveGraph[id]=neighborValues(edges).slice(0,30);
+            }
         }
-
-        return recommendationResponse(sortedRecs);
-
-    } catch (error) {
-        console.error('AI Recommendation Error:', error);
-        return recommendationResponse([]);
+        return recommendationResponse(profile,sanitizeCatalog(data.catalog),liveGraph);
+    } catch {
+        return NextResponse.json({ error: "Invalid profile" }, { status: 400, headers: CACHE_HEADERS });
     }
 }

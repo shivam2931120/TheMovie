@@ -1,138 +1,59 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { MovieCard } from './MovieCard';
-import { getMovieRecommendations, getMovieSummaries, getTVRecommendations } from '@/api/tmdb';
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { useContext, useEffect, useState } from "react";
+import { MovieCard } from "./MovieCard";
+import { getMovieRecommendations, getTVRecommendations } from "@/api/tmdb";
+import { personalizedMovies } from "@/lib/moviePersonalization";
+import { personalizedTV } from "@/lib/tvPersonalization";
+import { Sparkles } from "lucide-react";
+import { WatchedContext } from "@/context/WatchedContext";
+import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
+import { useRecommendationProfile } from "@/lib/useRecommendationProfile";
 
-const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 const hasCardData = (item: any) => item?.id && item?.poster_path && (item.title || item.name);
 
-export function AIRecommendations({ id, type = 'movie' }: { id: number, type?: 'movie' | 'tv' }) {
+export function AIRecommendations({ id, type = "movie" }: { id: number; type?: "movie" | "tv" }) {
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFallback, setIsFallback] = useState(false);
+    const { watched } = useContext(WatchedContext) as any;
+    const { isAllowed } = useRecommendationPreferences();
+    const profile = useRecommendationProfile(type);
+    const profileJson = JSON.stringify(profile);
 
     useEffect(() => {
-        let isMounted = true;
+        let active = true;
         const controller = new AbortController();
-
-        async function fetchRecommendations() {
-            try {
-                setLoading(true);
-                setIsFallback(false);
-                let items: any[] = [];
-
-                // 1. Try Custom AI Model (Movies Only)
-                if (type === 'movie') {
-                    try {
-                        const params = new URLSearchParams({ movieId: String(id) });
-                        const res = await fetch(`/api/ai-recommend?${params.toString()}`, {
-                            signal: controller.signal,
-                        });
-                        if (res.ok) {
-                            const data = await res.json();
-                            const recIds = Array.isArray(data.recommendations) ? data.recommendations : [];
-
-                            if (recIds.length > 0) {
-                                const topIds = recIds
-                                    .map((mid: number | string) => Number(mid))
-                                    .filter((mid: number) => Number.isInteger(mid) && mid > 0 && mid !== id)
-                                    .slice(0, 6);
-                                const results = await getMovieSummaries(topIds, 6);
-                                items = results
-                                    .filter(hasCardData)
-                                    .map((movie: any) => ({ ...movie, type: 'movie' }));
-                            }
-                        }
-                    } catch (e) {
-                        if (!isAbortError(e)) console.warn("AI fetch failed", e);
-                    }
-                }
-
-                // 2. Fallback / TV Handling
-                if (items.length === 0) {
-                    if (isMounted) setIsFallback(true);
-                    try {
-                        const tmdbRecs = type === 'movie'
-                            ? await getMovieRecommendations(id)
-                            : await getTVRecommendations(id);
-
-                        if (tmdbRecs && tmdbRecs.results) {
-                            items = tmdbRecs.results
-                                .filter(hasCardData)
-                                .slice(0, 6)
-                                .map((item: any) => ({ ...item, type }));
-                        }
-                    } catch (tmdbErr) {
-                        console.warn("TMDB Fallback failed:", tmdbErr);
-                    }
-                }
-
-                if (isMounted) {
-                    setRecommendations(items);
-                }
-            } catch (err) {
-                if (!isAbortError(err)) console.error("Failed to load recommendations", err);
-            } finally {
-                if (isMounted) setLoading(false);
+        setLoading(true);
+        setRecommendations([]);
+        setIsFallback(false);
+        async function load() {
+            let items: any[] = [];
+            const currentProfile = JSON.parse(profileJson);
+            if (type === "movie") {
+                items=await personalizedMovies(currentProfile,controller.signal,id);
             }
+            if (type === "tv") items = await personalizedTV(currentProfile, controller.signal, id);
+            if (!active) return;
+            if (!items.length) {
+                setIsFallback(true);
+                const data = type === "tv" ? await getTVRecommendations(id) : await getMovieRecommendations(id);
+                const requestId=crypto.randomUUID();
+                items = (data?.results || []).filter(hasCardData).map((item: any) => ({ ...item, type, recommendationReason: "Similar titles suggested by TMDB",recommendationModel:'tmdb-similar-v1',recommendationRequestId:requestId }));
+            }
+            if (active) setRecommendations(items.filter((item) => item.id !== id && !currentProfile.exclude.includes(item.id)));
         }
+        void load().catch(() => { if (active) setRecommendations([]); }).finally(() => { if (active) setLoading(false); });
+        return () => { active = false; controller.abort(); };
+    }, [id, type, profileJson]);
 
-        if (id) {
-            fetchRecommendations();
-        }
-
-        return () => {
-            isMounted = false;
-            controller.abort();
-        };
-    }, [id, type]);
-
-    if (loading) return (
-        <div className="py-8">
-            <div className="h-6 w-48 bg-white/5 rounded animate-pulse mb-4" />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {[...Array(6)].map((_, i) => (
-                    <div key={i} className="aspect-[2/3] rounded-xl bg-white/5 animate-pulse" />
-                ))}
-            </div>
-        </div>
-    );
-
-    if (recommendations.length === 0) return null;
-
+    const visible = recommendations.filter((item) => isAllowed(item, watched)).slice(0, 6);
+    if (loading) return <div className="py-8"><div className="mb-4 h-6 w-48 animate-pulse rounded bg-white/5" /><div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">{Array.from({ length: 6 }, (_, index) => <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />)}</div></div>;
+    if (!visible.length) return <p className="py-8 text-sm text-text-muted">No recommendations match your current preferences.</p>;
     return (
-        <section className="py-8 space-y-4">
-            <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-accent-primary/20 rounded-lg">
-                    <Sparkles className="text-accent-primary" size={20} />
-                </div>
-                <div>
-                    <h2 className="text-xl font-bold text-white">
-                        {type === 'movie' && !isFallback ? "AI Recommendations" : "Recommended for You"}
-                    </h2>
-                    <p className="text-xs text-text-muted">
-                        {type === 'movie' && !isFallback
-                            ? "Curated by our AI based on your viewing habits"
-                            : `Similar ${type === 'tv' ? 'TV Shows' : 'Movies'} you might like`}
-                    </p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {recommendations.map((item, index) => (
-                    <motion.div
-                        key={`${type}-${item.id}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                    >
-                        <MovieCard movie={item} />
-                    </motion.div>
-                ))}
-            </div>
+        <section className="space-y-4 py-8">
+            <div className="flex items-center gap-2"><Sparkles className="text-accent-primary" size={22} /><div><h2 className="text-xl font-bold text-white">Recommended for You</h2><p className="text-xs text-text-muted">{isFallback ? "Similar titles, filtered by your preferences" : "A mix of similar titles and your personal taste"}</p></div></div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">{visible.map((item) => <MovieCard key={`${type}-${item.id}`} movie={item} recommendation reason={item.recommendationReason} />)}</div>
         </section>
     );
 }

@@ -6,17 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import Image from "next/image";
-
-const getSafeRedirectUrl = () => {
-    if (typeof window === "undefined") return "/";
-
-    const params = new URLSearchParams(window.location.search);
-    const target = params.get("redirect_url")
-        || params.get("redirect_url_complete")
-        || params.get("returnUrl");
-
-    return target?.startsWith("/") ? target : "/";
-};
+import { getSafeRedirectUrl } from "@/lib/safeRedirect";
 
 export function CustomSignUp() {
     const { signUp, setActive, isLoaded } = useSignUp();
@@ -69,7 +59,7 @@ export function CustomSignUp() {
 
             if (completeSignUp.status === "complete") {
                 await setActive({ session: completeSignUp.createdSessionId });
-                router.push(getSafeRedirectUrl());
+                router.push(getSafeRedirectUrl(window.location.search));
             }
         } catch (err: any) {
             setError(err.errors?.[0]?.message || "Invalid verification code");
@@ -85,7 +75,7 @@ export function CustomSignUp() {
             await signUp.authenticateWithRedirect({
                 strategy: "oauth_google",
                 redirectUrl: "/sso-callback",
-                redirectUrlComplete: getSafeRedirectUrl(),
+                redirectUrlComplete: getSafeRedirectUrl(window.location.search),
             });
         } catch (err: any) {
             setError(err.errors?.[0]?.message || "Failed to sign up with Google");

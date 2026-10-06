@@ -2,55 +2,21 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { useAccountFeature } from "@/lib/useAccountFeature";
 
 const SocialContext = createContext();
 
+const INITIAL={following:[],followers:[],activityFeed:[]};
+const normalizeSocial=value=>({following:Array.isArray(value?.following)?value.following:[],followers:Array.isArray(value?.followers)?value.followers:[],activityFeed:Array.isArray(value?.activityFeed)?value.activityFeed.slice(0,50):[]});
+const mergeSocial=(a,b)=>({following:[...new Map([...a.following,...b.following].map(item=>[item.id,item])).values()],followers:a.followers,activityFeed:[...new Map([...a.activityFeed,...b.activityFeed].map(item=>[item.id,item])).values()].slice(0,50)});
+
 export function SocialProvider({ children }) {
     const { user, isSignedIn } = useUser();
-    const [following, setFollowing] = useState([]);
-    const [followers, setFollowers] = useState([]);
-    const [activityFeed, setActivityFeed] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    // Load social data
-    useEffect(() => {
-        const loadSocialData = async () => {
-            try {
-                if (isSignedIn && user) {
-                    const socialData = user.unsafeMetadata?.social || {};
-                    setFollowing(socialData.following || []);
-                    setFollowers(socialData.followers || []);
-                    setActivityFeed(socialData.activityFeed || []);
-                } else {
-                    const local = localStorage.getItem("socialData");
-                    if (local) {
-                        const parsed = JSON.parse(local);
-                        setFollowing(parsed.following || []);
-                        setActivityFeed(parsed.activityFeed || []);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to load social data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadSocialData();
-    }, [user, isSignedIn]);
-
-    // Save social data
-    const saveSocialData = async (data) => {
-        try {
-            if (isSignedIn && user) {
-                await saveUnsafeMetadata(user, { social: data });
-            } else {
-                localStorage.setItem("socialData", JSON.stringify(data));
-            }
-        } catch (error) {
-            console.error("Failed to save social data:", error);
-        }
-    };
+    const {data,update,loading}=useAccountFeature('social',INITIAL,mergeSocial,normalizeSocial);
+    const {following,followers,activityFeed}=data;
+    const setFollowing=apply=>update(current=>({...current,following:typeof apply==='function'?apply(current.following):apply}));
+    const setActivityFeed=apply=>update(current=>({...current,activityFeed:typeof apply==='function'?apply(current.activityFeed):apply}));
+    const saveSocialData=async()=>{};
 
     // Follow a user
     const followUser = async (targetUser) => {

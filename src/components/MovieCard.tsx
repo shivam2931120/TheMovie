@@ -1,15 +1,19 @@
 "use client";
 
-import { motion, useMotionValue, useTransform, PanInfo } from "framer-motion";
+import { motion, useMotionValue, useTransform, useReducedMotion, PanInfo } from "framer-motion";
 import { PlayCircle, Plus, Check, Eye, EyeOff, Star, Info } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect, useRef } from "react";
 import clsx from "clsx";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useRatings } from "@/context/ReviewContext";
+import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
+
+import { usePathname } from "next/navigation";
+import { useFeedback } from "@/context/FeedbackContext";
 
 interface Movie {
     id: number;
@@ -20,6 +24,8 @@ interface Movie {
     release_date?: string;
     first_air_date?: string;
     overview?: string;
+    recommendationModel?: string;
+    recommendationRequestId?: string;
     type?: "movie" | "tv";
 }
 
@@ -27,13 +33,21 @@ interface MovieCardProps {
     movie: Movie;
     className?: string;
     priority?: boolean;
+    recommendation?: boolean;
+    reason?: string;
 }
 
 const QUICK_RATING_SCORES = [2, 4, 6, 8, 10];
 
-export function MovieCard({ movie, className, priority = false }: MovieCardProps) {
+export function MovieCard({ movie, className, priority = false, recommendation = false, reason }: MovieCardProps) {
     const { isSignedIn } = useUser();
+    const { record, enabled, owner } = useFeedback();
+    const pathname = usePathname();
+    const source = pathname === "/search" ? "search" : pathname === "/" ? "home" : "details";
+    const cardRef = useRef<HTMLDivElement>(null);
+    const reducedMotion = useReducedMotion();
     const { openSignIn } = useClerk();
+    const { dismiss } = useRecommendationPreferences();
 
     const [isHovered, setIsHovered] = useState(false);
     const [swipeAction, setSwipeAction] = useState<'watchlist' | 'watched' | null>(null);
@@ -75,6 +89,29 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
     const year = date ? date.split("-")[0] : "";
     const rating = typeof movie.vote_average === "number" ? movie.vote_average : null;
 
+    useEffect(() => {
+        if (!recommendation || !enabled || !cardRef.current) return;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let sent=false;
+        let visible=false;
+        const schedule=()=>{
+            clearTimeout(timer);
+            if(document.visibilityState==='visible'&&visible&&!sent)timer=setTimeout(()=>{
+                if(document.visibilityState!=='visible'||!visible)return;
+                sent=true;
+                record({id:movie.id,type,kind:'impression',source,model:movie.recommendationModel,requestId:movie.recommendationRequestId});
+                observer.disconnect();
+            },1000);
+        };
+        const observer=new IntersectionObserver(entries=>{
+            visible=Boolean(entries[0]?.isIntersecting&&entries[0].intersectionRatio>=0.6);
+            schedule();
+        },{threshold:[0,0.6]});
+        observer.observe(cardRef.current);
+        document.addEventListener('visibilitychange',schedule);
+        return ()=>{clearTimeout(timer);observer.disconnect();document.removeEventListener('visibilitychange',schedule);};
+    },[recommendation,enabled,owner,movie.id,movie.recommendationModel,movie.recommendationRequestId,type,source,record]);
+
     const handleDragEnd = (_event: any, info: PanInfo) => {
         const offset = info.offset.x;
         const velocity = info.velocity.x;
@@ -103,18 +140,19 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
 
     return (
         <motion.div
+            ref={cardRef}
             className={clsx(
                 "relative group rounded-xl overflow-hidden cursor-pointer touch-pan-y shadow-elevated transition-transform duration-500 ease-out will-change-transform",
                 className
             )}
             style={{ backgroundColor, x }}
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "50px" }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            whileHover={{ scale: 1.05, zIndex: 30 }}
-            drag="x"
+            whileHover={reducedMotion ? undefined : { scale: 1.05, zIndex: 30 }}
+            drag={reducedMotion ? false : "x"}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.2}
             onDragEnd={handleDragEnd}
@@ -156,15 +194,15 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90 transition-opacity duration-500 group-hover:opacity-100" />
                 <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] pointer-events-none" />
 
-                <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-inset" />
+                <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} onClick={() => { if (recommendation) record({id:movie.id,type,kind:"click",source,model:movie.recommendationModel,requestId:movie.recommendationRequestId}); }} aria-label={`View ${title || "title"}`} className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-inset" />
 
                 {/* Hover UI */}
-                <div className="absolute inset-0 flex flex-col justify-center items-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                <div className="absolute inset-0 flex flex-col justify-center items-center z-20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none">
                     <PlayCircle size={48} className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500 delay-100" />
                 </div>
 
                 {/* Default Visible Metadata */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none transform transition-transform duration-500 group-hover:-translate-y-12">
+                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none transform transition-transform duration-500 group-hover:-translate-y-12 group-focus-within:-translate-y-12 max-sm:-translate-y-12">
                     {rating !== null && rating > 0 && (
                         <div className="flex items-center gap-1.5 mb-1.5">
                             <Star size={12} className="text-accent-primary fill-accent-primary" />
@@ -178,12 +216,12 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
                 </div>
 
                 {/* Hover Reveal Actions */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 z-30 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-between pointer-events-auto bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
-                    <div className="flex gap-2">
+                <div className="absolute bottom-0 left-0 right-0 p-1 sm:p-4 z-30 translate-y-full group-hover:translate-y-0 group-focus-within:translate-y-0 max-sm:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-between pointer-events-auto bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
+                    <div className="flex gap-0.5 sm:gap-2">
                         <button
                             onClick={(e) => handleAction(e, () => isWatchlisted ? remove(movie.id, type) : add({ ...movie, type }))}
                             className={clsx(
-                                "p-2 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
+                                "p-3 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
                                 isWatchlisted ? "bg-accent-primary border-accent-primary text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
                             aria-label={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
@@ -193,7 +231,7 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
                         <button
                             onClick={(e) => handleAction(e, () => isWatched ? removeWatched(movie.id, type) : addWatched({ ...movie, type }))}
                             className={clsx(
-                                "p-2 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
+                                "p-3 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
                                 isWatched ? "bg-green-600 border-green-600 text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
                             aria-label={isWatched ? "Mark unwatched" : "Mark watched"}
@@ -203,12 +241,18 @@ export function MovieCard({ movie, className, priority = false }: MovieCardProps
                     </div>
                     <Link
                         href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`}
-                        className="p-2 rounded-full bg-white/10 border border-white/20 text-white backdrop-blur-md hover:bg-white/20 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none"
+                        aria-label={`Details for ${title || "title"}`}
+                        onClick={() => { if (recommendation) record({id:movie.id,type,kind:"click",source,model:movie.recommendationModel,requestId:movie.recommendationRequestId}); }}
+                        className="p-3 rounded-full bg-white/10 border border-white/20 text-white backdrop-blur-md hover:bg-white/20 transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none"
                     >
                         <Info size={16} />
                     </Link>
                 </div>
             </div>
+            {recommendation && <div className="space-y-2 border-t border-white/10 bg-bg-card p-3 text-xs" onPointerDown={(event) => event.stopPropagation()}>
+                <details className="text-text-secondary"><summary className="cursor-pointer text-accent-primary">Why this title?</summary><p className="mt-2">{reason || "Similar to titles you enjoy"}</p></details>
+                <button type="button" onClick={(event) => { event.stopPropagation(); dismiss({ ...movie, type }); }} className="text-text-muted hover:text-white" aria-label={`Not interested in ${title}`}>Not interested</button>
+            </div>}
         </motion.div>
     );
 }

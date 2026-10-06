@@ -30,7 +30,7 @@ export default function CollectionsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-16">
                     {FRANCHISES.map((collection) => (
-                        <div key={collection.id} className="relative aspect-video group cursor-pointer overflow-hidden rounded-xl border border-white/5">
+                        <Link key={collection.id} href={`/collection/${collection.id}`} className="relative aspect-video group cursor-pointer overflow-hidden rounded-xl border border-white/5">
                             <Image
                                 src={`https://image.tmdb.org/t/p/w780${collection.poster}`}
                                 alt={collection.name || 'Collection'}
@@ -43,7 +43,7 @@ export default function CollectionsPage() {
                             <div className="absolute bottom-4 left-4 right-4">
                                 <h3 className="text-white font-bold text-lg drop-shadow-md">{collection.name}</h3>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
 

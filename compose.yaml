@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: themovie
+      POSTGRES_PASSWORD: local-development-only
+      POSTGRES_DB: themovie
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - movie_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U themovie -d themovie']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  movie_postgres:

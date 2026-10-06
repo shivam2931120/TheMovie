@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
-import { clearStoredKeys, hasGuestMergeChanges, mergeTypedItems, readStoredJsonFromKeys } from "@/lib/guestDataMerge";
+import { reorderListEntry, transferListEntries } from "@/lib/listManagement";
+import { useAccountFeature } from "@/lib/useAccountFeature";
+import { mergeTypedItems } from "@/lib/guestDataMerge";
 
 const ListsContext = createContext();
-const STORAGE_KEY = "movie_catalogue_custom_lists_v2";
 
 const DEFAULT_LISTS = [
     { id: "favorites", name: "My Favorites", icon: "Heart", isDefault: true, isPublic: false, movies: [] },
@@ -28,13 +28,14 @@ const minifyItem = (item) => ({
 const normalizeList = (list) => ({
     ...list,
     isPublic: Boolean(list.isPublic),
+    description: typeof list.description === "string" ? list.description : "",
     movies: Array.isArray(list.movies)
         ? list.movies.map((movie) => ({ ...movie, type: itemType(movie) }))
         : [],
 });
 
 const mergeWithDefaults = (savedLists = []) => {
-    const normalized = savedLists.map(normalizeList);
+    const normalized = (Array.isArray(savedLists) ? savedLists : []).filter(list => list?.id).map(normalizeList);
     const savedIds = new Set(normalized.map((list) => list.id));
     return [
         ...DEFAULT_LISTS.filter((list) => !savedIds.has(list.id)),
@@ -75,76 +76,13 @@ const encodeSharePayload = (payload) => {
 };
 
 export function ListsProvider({ children }) {
-    const { user, isSignedIn, isLoaded } = useUser();
-    const [lists, setLists] = useState(DEFAULT_LISTS);
-    const [loading, setLoading] = useState(true);
-    const initialized = useRef(false);
-    const saveTimeout = useRef(null);
-
-    useEffect(() => {
-        if (!isLoaded) return;
-        initialized.current = false;
-
-        try {
-            if (isSignedIn && user) {
-                const savedLists = user.unsafeMetadata?.customLists;
-                const accountLists = Array.isArray(savedLists) && savedLists.length > 0 ? mergeWithDefaults(savedLists) : DEFAULT_LISTS;
-                const guestListData = readStoredJsonFromKeys([STORAGE_KEY, "customLists"], []);
-                const guestLists = Array.isArray(guestListData) && guestListData.length > 0 ? mergeWithDefaults(guestListData) : [];
-                const mergedLists = guestLists.length > 0 ? mergeListCollections(accountLists, guestLists) : accountLists;
-
-                setLists(mergedLists);
-
-                if ((guestLists.length > 0 && hasGuestMergeChanges(accountLists, mergedLists)) || hasGuestMergeChanges(savedLists || [], accountLists)) {
-                    void saveUnsafeMetadata(user, { customLists: mergedLists }).then(() => {
-                        clearStoredKeys([STORAGE_KEY, "customLists"]);
-                    }).catch((error) => {
-                        console.error("Failed to merge guest lists into Clerk:", error);
-                    });
-                } else if (guestLists.length > 0) {
-                    clearStoredKeys([STORAGE_KEY, "customLists"]);
-                }
-            } else {
-                const localLists = readStoredJsonFromKeys([STORAGE_KEY, "customLists"], null);
-                setLists(localLists ? mergeWithDefaults(localLists) : DEFAULT_LISTS);
-            }
-        } catch (error) {
-            console.error("Failed to load lists:", error);
-            setLists(DEFAULT_LISTS);
-        } finally {
-            setLoading(false);
-            setTimeout(() => { initialized.current = true; }, 100);
-        }
-    }, [user, isSignedIn, isLoaded]);
-
-    useEffect(() => {
-        if (!isLoaded || !initialized.current) return;
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-        saveTimeout.current = setTimeout(() => {
-            if (isSignedIn && user) {
-                saveUnsafeMetadata(user, { customLists: lists }).catch((error) => {
-                    console.error("Failed to save lists to Clerk:", error);
-                    try {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(lists));
-                    } catch { /* ignore */ }
-                });
-            } else {
-                try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(lists));
-                } catch { /* ignore */ }
-            }
-        }, 800);
-
-        return () => {
-            if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        };
-    }, [lists, isSignedIn, user, isLoaded]);
-
-    const createList = useCallback(async (name, icon = "List") => {
+    const { data: lists, update: setLists, loading, status, owner } = useAccountFeature("customLists", DEFAULT_LISTS, mergeListCollections, mergeWithDefaults);
+    const { user, isSignedIn } = useUser();
+    const createList = useCallback(async (name, icon = "List", description = "") => {
         const newList = {
-            id: `list-${Date.now()}`,
-            name,
+            id: `list-${crypto.randomUUID()}`,
+            name: name.trim().slice(0, 100),
+            description: description.trim().slice(0, 1000),
             icon,
             isDefault: false,
             movies: [],
@@ -154,23 +92,38 @@ export function ListsProvider({ children }) {
 
         setLists((prev) => [...prev, newList]);
         return newList;
-    }, []);
+    }, [setLists]);
 
     const deleteList = useCallback(async (listId) => {
         setLists((prev) => prev.filter((list) => list.id !== listId || list.isDefault));
-    }, []);
+    }, [setLists]);
 
     const renameList = useCallback(async (listId, newName) => {
         setLists((prev) => prev.map((l) =>
             l.id === listId ? { ...l, name: newName } : l
         ));
-    }, []);
+    }, [setLists]);
 
     const toggleListPublic = useCallback(async (listId) => {
-        setLists((prev) => prev.map((l) =>
-            l.id === listId ? { ...l, isPublic: !l.isPublic } : l
-        ));
-    }, []);
+        if (!isSignedIn || !user) throw new Error("Sign in to publish or revoke a shared list.");
+        const current = lists.find((list) => list.id === listId);
+        if (!current) throw new Error("This list no longer exists.");
+        // Wait for the database before reporting publication/revocation success.
+        const completion = new Promise((resolve,reject) => {
+            const timer = setTimeout(() => { cleanup(); reject(new Error("List sync is taking longer than expected. Check account sync before sharing.")); },20000);
+            const handler = event => {
+                const detail=event.detail;
+                if(detail?.feature!=="customLists" || detail.owner!==owner) return;
+                if(detail.status==="Synced to your account") {cleanup();resolve();}
+                else if(/unavailable|Conflict|storage unavailable/.test(detail.status)) {cleanup();reject(new Error(detail.status));}
+            };
+            const cleanup = () => { clearTimeout(timer);window.removeEventListener("themovie-sync-status",handler); };
+            window.addEventListener("themovie-sync-status",handler);
+        });
+        setLists(prev => prev.map(list => list.id === listId ? { ...list, isPublic: !list.isPublic } : list));
+        await completion;
+
+    }, [isSignedIn, lists, user, setLists, owner]);
 
     const addToList = useCallback(async (listId, movie) => {
         const nextItem = minifyItem(movie);
@@ -179,14 +132,36 @@ export function ListsProvider({ children }) {
             if (l.movies.some((m) => itemKey(m.id, itemType(m)) === itemKey(nextItem.id, nextItem.type))) return l;
             return { ...l, movies: [nextItem, ...l.movies] };
         }));
-    }, []);
+    }, [setLists]);
 
     const removeFromList = useCallback(async (listId, movieId, type = "movie") => {
         setLists((prev) => prev.map((l) => {
             if (l.id !== listId) return l;
             return { ...l, movies: l.movies.filter((m) => itemKey(m.id, itemType(m)) !== itemKey(movieId, type)) };
         }));
-    }, []);
+    }, [setLists]);
+
+    const updateListDetails = useCallback(async (listId, name, description = "") => {
+        if (!name.trim()) return;
+        setLists((prev) => prev.map((list) => list.id === listId
+            ? { ...list, name: name.trim().slice(0, 100), description: description.trim().slice(0, 1000) }
+            : list));
+    }, [setLists]);
+
+    const reorderListItem = useCallback((listId, key, direction) => {
+        setLists((prev) => reorderListEntry(prev, listId, key, direction));
+    }, [setLists]);
+
+    const removeListItems = useCallback((listId, keys) => {
+        const selected = new Set(keys);
+        setLists((prev) => prev.map((list) => list.id === listId
+            ? { ...list, movies: list.movies.filter((movie) => !selected.has(itemKey(movie.id, itemType(movie)))) }
+            : list));
+    }, [setLists]);
+
+    const transferListItems = useCallback((sourceId, targetId, keys, move = false) => {
+        setLists((prev) => transferListEntries(prev, sourceId, targetId, keys, move));
+    }, [setLists]);
 
     const isInList = useCallback((listId, movieId, type = "movie") => {
         const list = lists.find((l) => l.id === listId);
@@ -195,16 +170,11 @@ export function ListsProvider({ children }) {
 
     const getShareLink = useCallback((listId) => {
         const list = lists.find((l) => l.id === listId);
-        if (!list?.isPublic) return null;
+        if (!list?.isPublic || !isSignedIn || !user || status !== "Synced to your account") return null;
         const origin = typeof window !== "undefined" ? window.location.origin : "";
-        const data = encodeSharePayload({
-            name: list.name,
-            movies: list.movies,
-            createdAt: list.createdAt,
-            sharedAt: new Date().toISOString(),
-        });
+        const data = encodeSharePayload({ userId: user.id, listId: list.id });
         return `${origin}/shared-list/${data}`;
-    }, [lists]);
+    }, [isSignedIn, lists, user, status]);
 
     const value = useMemo(() => ({
         lists,
@@ -212,12 +182,16 @@ export function ListsProvider({ children }) {
         createList,
         deleteList,
         renameList,
+        updateListDetails,
+        reorderListItem,
+        removeListItems,
+        transferListItems,
         toggleListPublic,
         addToList,
         removeFromList,
         isInList,
         getShareLink,
-    }), [lists, loading, createList, deleteList, renameList, toggleListPublic, addToList, removeFromList, isInList, getShareLink]);
+    }), [lists, loading, createList, deleteList, renameList, updateListDetails, reorderListItem, removeListItems, transferListItems, toggleListPublic, addToList, removeFromList, isInList, getShareLink]);
 
     return (
         <ListsContext.Provider value={value}>

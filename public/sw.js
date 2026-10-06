@@ -1,5 +1,5 @@
 // TheMovie Service Worker — Caches images, API responses, and app shell for offline use
-const CACHE_NAME = "themovie-v1";
+const CACHE_NAME = "themovie-v2";
 const IMAGE_CACHE = "themovie-images-v1";
 const API_CACHE = "themovie-api-v1";
 
@@ -11,21 +11,22 @@ self.addEventListener("install", (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
     );
-    self.skipWaiting();
 });
 
 // Activate: clean up old caches
 self.addEventListener("activate", (event) => {
     event.waitUntil(
-        caches.keys().then((keys) =>
+        Promise.all([
+            caches.keys().then((keys) =>
             Promise.all(
                 keys
                     .filter((key) => key !== CACHE_NAME && key !== IMAGE_CACHE && key !== API_CACHE)
                     .map((key) => caches.delete(key))
             )
-        )
+            ),
+            self.clients.claim(),
+        ])
     );
-    self.clients.claim();
 });
 
 // Fetch handler with different strategies per request type
@@ -35,6 +36,9 @@ self.addEventListener("fetch", (event) => {
 
     // Skip non-GET requests
     if (request.method !== "GET") return;
+
+    // API responses can contain changing or private data and must not be cached.
+    if (url.origin === self.location.origin && url.pathname.startsWith("/api/")) return;
 
     // Skip chrome-extension, dev server HMR, and other non-http
     if (!url.protocol.startsWith("http")) return;
@@ -113,6 +117,10 @@ self.addEventListener("fetch", (event) => {
 
 // Periodic cleanup: limit image cache to 500 entries
 self.addEventListener("message", (event) => {
+    if (event.data?.type === "SKIP_WAITING") {
+        self.skipWaiting();
+        return;
+    }
     if (event.data === "CLEANUP") {
         caches.open(IMAGE_CACHE).then((cache) =>
             cache.keys().then((keys) => {

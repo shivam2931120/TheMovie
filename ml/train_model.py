@@ -19,6 +19,31 @@ SVD_COMPONENTS = 80
 COLLAB_WEIGHT = 0.68
 CONTENT_WEIGHT = 0.32
 QUALITY_WEIGHT = 0.04
+RATING_NORMALIZATION = "raw"  # Change only after an independent temporal evaluation.
+
+def build_rating_matrix(ratings, movie_ids, normalization="raw"):
+    """Missing ratings stay zero; normalization applies only to observed events.
+
+    Centered/scaled ratings remove a user's generous/strict scoring tendency.
+    A 0.5-rating variance floor keeps constant-rating users numerically stable.
+    """
+    movie_lookup = {int(movie_id): index for index, movie_id in enumerate(movie_ids)}
+    user_ids = sorted(ratings["userId"].unique())
+    user_lookup = {int(user_id): index for index, user_id in enumerate(user_ids)}
+    selected = ratings[ratings["movieId"].isin(movie_lookup)].copy()
+    values = selected["rating"].astype(float)
+    if normalization == "user_centered":
+        user_groups = selected.groupby("userId")["rating"]
+        means = user_groups.transform("mean")
+        std = user_groups.transform("std").fillna(0).clip(lower=0.5)
+        values = (values - means) / std
+    elif normalization != "raw":
+        raise ValueError(f"Unknown rating normalization: {normalization}")
+    return csr_matrix((values.to_numpy(dtype=np.float32), (
+        selected["movieId"].map(movie_lookup).to_numpy(),
+        selected["userId"].map(user_lookup).to_numpy(),
+    )), shape=(len(movie_lookup), len(user_lookup)))
+
 
 def clean_title(title):
     return re.sub(r"\s*\(\d{4}\)\s*$", "", str(title)).strip()
@@ -167,23 +192,11 @@ def train_and_export():
     # ---------------------------------------------------------
     print("👥 Training Collaborative Model (User Patterns)...")
     
-    # Create User-Item Matrix (Rows: Movies, Cols: Users)
-    user_movie_matrix = ratings.pivot(index='movieId', columns='userId', values='rating')
-    
-    # Fill NaN with 0 (user didn't rate)
-    user_movie_matrix = user_movie_matrix.fillna(0)
-    
-    # Align indices between 'movies' DF and 'user_movie_matrix'
-    # Use only movies that exist in both
-    available_movie_ids = user_movie_matrix.index
-    movies = movies[movies['movieId'].isin(available_movie_ids)].reset_index(drop=True)
-    
-    # Re-filter matrix to match sorted movies dataframe order
-    user_movie_matrix = user_movie_matrix.loc[movies['movieId']]
-    
-    # Convert to Sparse Matrix for speed
-    sparse_user_movie = csr_matrix(user_movie_matrix.values)
-    
+    # Keep the sparse movie-user matrix aligned with export rows.
+    available_movie_ids = ratings["movieId"].unique()
+    movies = movies[movies["movieId"].isin(available_movie_ids)].reset_index(drop=True)
+    sparse_user_movie = build_rating_matrix(ratings, movies["movieId"], RATING_NORMALIZATION)
+
     # ---------------------------------------------------------
     # IMPROVEMENT: SVD (Matrix Factorization)
     # Reduces noise and finds "Latent Patterns" (e.g. concepts like "Dark Humour")
@@ -194,7 +207,7 @@ def train_and_export():
     
     # Reduce to latent preference features. 80 components keeps more signal than
     # the previous 50 while staying small enough for fast offline generation.
-    svd = TruncatedSVD(n_components=SVD_COMPONENTS, random_state=42)
+    svd = TruncatedSVD(n_components=min(SVD_COMPONENTS, sparse_user_movie.shape[1] - 1), random_state=42)
     latent_matrix = svd.fit_transform(sparse_user_movie)
 
     # ---------------------------------------------------------
@@ -252,10 +265,12 @@ def train_and_export():
             candidate_indices = candidate_indices[np.argsort(scores[candidate_indices])[::-1]]
 
             recs = []
+            seen_tmdb = {int(tmdb_id)}
             for candidate_idx in candidate_indices:
                 rec_tmdb = tmdb_ids[candidate_idx]
-                if pd.isna(rec_tmdb):
+                if pd.isna(rec_tmdb) or int(rec_tmdb) in seen_tmdb:
                     continue
+                seen_tmdb.add(int(rec_tmdb))
                 recs.append(int(rec_tmdb))
                 if len(recs) >= RECOMMENDATION_COUNT:
                     break

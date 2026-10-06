@@ -1,74 +1,31 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
-import { clearStoredKeys, hasGuestMergeChanges, mergeTVProgress, readStoredJson } from "@/lib/guestDataMerge";
+import { createContext, useContext, useCallback, useMemo } from "react";
+import { useAccountFeature } from "@/lib/useAccountFeature";
+import { mergeTVProgress } from "@/lib/guestDataMerge";
 
 export const TVWatchProgressContext = createContext<any>(null);
 
-const STORAGE_KEY = "tv_watch_progress_v1";
-
-export function TVWatchProgressProvider({ children }: { children: React.ReactNode }) {
-    const { user, isSignedIn, isLoaded } = useUser();
-    const [progress, setProgress] = useState<Record<string, any>>({});
-    const initialized = useRef(false);
-    const saveTimeout = useRef<NodeJS.Timeout | null>(null);
-
-    // Load from storage
-    useEffect(() => {
-        if (!isLoaded) return;
-        initialized.current = false;
-
-        if (isSignedIn && user) {
-            const userProgress = user.unsafeMetadata?.tvProgress || {};
-            const guestProgress = readStoredJson(STORAGE_KEY, {});
-            const mergedProgress = mergeTVProgress(userProgress, guestProgress);
-            setProgress(mergedProgress);
-
-            if (Object.keys(guestProgress).length > 0 && hasGuestMergeChanges(userProgress, mergedProgress)) {
-                saveUnsafeMetadata(user, { tvProgress: mergedProgress }).then(() => {
-                    clearStoredKeys([STORAGE_KEY]);
-                }).catch(() => {
-                    try {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(guestProgress));
-                    } catch { /* ignore */ }
-                });
-            } else if (Object.keys(guestProgress).length > 0) {
-                clearStoredKeys([STORAGE_KEY]);
-            }
-        } else {
-            try {
-                setProgress(readStoredJson(STORAGE_KEY, {}));
-            } catch {
-                setProgress({});
+type Progress = Record<string, Record<string, Record<string, boolean>>>;
+const EMPTY_PROGRESS: Progress = {};
+const normalizeProgress = (value: unknown): Progress => {
+    const result: Progress = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+    for (const [show,seasons] of Object.entries(value)) {
+        if (!/^\d+$/.test(show) || !seasons || typeof seasons !== 'object') continue;
+        for (const [season,episodes] of Object.entries(seasons)) {
+            if (!/^\d+$/.test(season) || !episodes || typeof episodes !== 'object') continue;
+            for (const [episode,seen] of Object.entries(episodes)) if (/^\d+$/.test(episode) && Number(episode)>0 && seen === true) {
+                result[show] ||= {}; result[show][season] ||= {}; result[show][season][episode] = true;
             }
         }
-        setTimeout(() => { initialized.current = true; }, 100);
-    }, [isSignedIn, user, isLoaded]);
-
-    // Save to storage (debounced, skip initial mount)
-    useEffect(() => {
-        if (!isLoaded || !initialized.current) return;
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-        saveTimeout.current = setTimeout(() => {
-            if (isSignedIn && user) {
-                saveUnsafeMetadata(user, { tvProgress: progress }).catch(() => {
-                    try {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-                    } catch { /* ignore */ }
-                });
-            } else {
-                try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-                } catch { /* ignore */ }
-            }
-        }, 1000);
-
-        return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
-    }, [progress, isSignedIn, user, isLoaded]);
-
+    }
+    return result;
+};
+const mergeProgress = (a: Progress,b: Progress) => mergeTVProgress(a,b) as Progress;
+export function TVWatchProgressProvider({ children }: { children: React.ReactNode }) {
+    const {data: progress,update: setProgress,loading} = useAccountFeature('tvProgress',EMPTY_PROGRESS,mergeProgress,normalizeProgress);
+    const ready = !loading;
     const markEpisodeWatched = useCallback((showId: number, season: number, episode: number) => {
         setProgress(prev => ({
             ...prev,
@@ -80,24 +37,47 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
                 }
             }
         }));
-    }, []);
+    }, [setProgress]);
 
     const unmarkEpisodeWatched = useCallback((showId: number, season: number, episode: number) => {
         setProgress(prev => {
-            const newProgress = { ...prev };
-            if (newProgress[showId]?.[season]) {
-                delete newProgress[showId][season][episode];
-                // Clean up empty objects
-                if (Object.keys(newProgress[showId][season]).length === 0) {
-                    delete newProgress[showId][season];
-                }
-                if (Object.keys(newProgress[showId]).length === 0) {
-                    delete newProgress[showId];
+            if (!prev[showId]?.[season]?.[episode]) return prev;
+            const seasonProgress = { ...prev[showId][season] };
+            delete seasonProgress[episode];
+            const showProgress = { ...prev[showId] };
+            if (Object.keys(seasonProgress).length) showProgress[season] = seasonProgress;
+            else delete showProgress[season];
+            const next = { ...prev };
+            if (Object.keys(showProgress).length) next[showId] = showProgress;
+            else delete next[showId];
+            return next;
+        });
+    }, [setProgress]);
+
+    const markSeasonWatched = useCallback((showId: number, season: number, episodeNumbers: number[]) => {
+        setProgress(prev => ({
+            ...prev,
+            [showId]: {
+                ...(prev[showId] || {}),
+                [season]: {
+                    ...(prev[showId]?.[season] || {}),
+                    ...Object.fromEntries(episodeNumbers.filter(n => Number.isInteger(n) && n > 0).map(n => [n, true]))
                 }
             }
-            return newProgress;
+        }));
+    }, [setProgress]);
+
+    const clearSeason = useCallback((showId: number, season: number) => {
+        setProgress(prev => {
+            if (!prev[showId]?.[season]) return prev;
+            const showProgress = { ...prev[showId] };
+            delete showProgress[season];
+            const next = { ...prev };
+            if (Object.keys(showProgress).length) next[showId] = showProgress;
+            else delete next[showId];
+            return next;
         });
-    }, []);
+    }, [setProgress]);
 
     const isEpisodeWatched = useCallback((showId: number, season: number, episode: number) => {
         return !!progress[showId]?.[season]?.[episode];
@@ -107,37 +87,46 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
         const showProgress = progress[showId] || {};
         let watchedCount = 0;
         Object.values(showProgress).forEach((season: any) => {
-            watchedCount += Object.keys(season).length;
+            watchedCount += Object.values(season).filter(Boolean).length;
         });
         return {
             watched: watchedCount,
             total: totalEpisodes,
-            percentage: totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0
+            percentage: totalEpisodes > 0 ? (Math.min(watchedCount, totalEpisodes) / totalEpisodes) * 100 : 0
         };
     }, [progress]);
 
     const getSeasonProgress = useCallback((showId: number, seasonNumber: number, totalEpisodes: number) => {
         const seasonData = progress[showId]?.[seasonNumber] || {};
-        const watchedCount = Object.keys(seasonData).length;
+        const watchedCount = Object.values(seasonData).filter(Boolean).length;
         return {
             watched: watchedCount,
             total: totalEpisodes,
-            percentage: totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0
+            percentage: totalEpisodes > 0 ? (Math.min(watchedCount, totalEpisodes) / totalEpisodes) * 100 : 0
         };
     }, [progress]);
 
     const value = useMemo(() => ({
         markEpisodeWatched,
         unmarkEpisodeWatched,
+        markSeasonWatched,
+        clearSeason,
         isEpisodeWatched,
         getShowProgress,
         getSeasonProgress,
-        progress
-    }), [markEpisodeWatched, unmarkEpisodeWatched, isEpisodeWatched, getShowProgress, getSeasonProgress, progress]);
+        progress,
+        isLoaded: ready
+    }), [markEpisodeWatched, unmarkEpisodeWatched, markSeasonWatched, clearSeason, isEpisodeWatched, getShowProgress, getSeasonProgress, progress, ready]);
 
     return (
         <TVWatchProgressContext.Provider value={value}>
             {children}
         </TVWatchProgressContext.Provider>
     );
+}
+
+export function useTVWatchProgress() {
+    const context = useContext(TVWatchProgressContext);
+    if (!context) throw new Error("useTVWatchProgress must be used within TVWatchProgressProvider");
+    return context;
 }

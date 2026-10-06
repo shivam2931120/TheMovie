@@ -1,0 +1,283 @@
+{
+  "dataset_sha256": "2c0f34fd943d31ee77ed415f3302c9f707a14e151d5cea922023689a318230ef",
+  "data_quality": {
+    "invalid_events": 0,
+    "duplicate_events": 0
+  },
+  "data_origin": "public_movielens_benchmark",
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1"
+  },
+  "train_events": 70576,
+  "validation_events": 15123,
+  "test_events": 15124,
+  "validation_cutoff": 1376822969.0,
+  "test_cutoff": 1479542666.0,
+  "candidate_configs": [
+    {
+      "name": "svd_32",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": false
+    },
+    {
+      "name": "svd_32_idf",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": true
+    },
+    {
+      "name": "svd_64_idf",
+      "algorithm": "svd",
+      "components": 64,
+      "idf": true
+    },
+    {
+      "name": "item_cosine_idf",
+      "algorithm": "item_cosine",
+      "components": 0,
+      "idf": true
+    }
+  ],
+  "selected_configs": {
+    "movie": {
+      "name": "item_cosine_idf",
+      "algorithm": "item_cosine",
+      "components": 0,
+      "idf": true
+    },
+    "tv": {
+      "name": "svd_32",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": false
+    }
+  },
+  "validation_candidates": {
+    "svd_32": {
+      "movie": {
+        "ndcg_at_20": 0.14814386437188018,
+        "recall_at_20": 0.0453802032200575,
+        "precision_at_20": 0.1392857142857143,
+        "hit_rate": 0.6428571428571429,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "users": 14,
+        "catalog_coverage": 0.024151080443072452
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "svd_32_idf": {
+      "movie": {
+        "ndcg_at_20": 0.1520721458292351,
+        "recall_at_20": 0.04745791122633695,
+        "precision_at_20": 0.14285714285714288,
+        "hit_rate": 0.6428571428571429,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "users": 14,
+        "catalog_coverage": 0.024332667514072998
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "svd_64_idf": {
+      "movie": {
+        "ndcg_at_20": 0.14352228458947874,
+        "recall_at_20": 0.04210906587344742,
+        "precision_at_20": 0.13214285714285717,
+        "hit_rate": 0.5714285714285714,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "users": 14,
+        "catalog_coverage": 0.023787906301071363
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "item_cosine_idf": {
+      "movie": {
+        "ndcg_at_20": 0.16123415831799576,
+        "recall_at_20": 0.0604684098933419,
+        "precision_at_20": 0.12500000000000003,
+        "hit_rate": 0.7857142857142857,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "users": 14,
+        "catalog_coverage": 0.020700926094062103
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    }
+  },
+  "validation": {
+    "movie": {
+      "ndcg_at_20": 0.16123415831799576,
+      "recall_at_20": 0.0604684098933419,
+      "precision_at_20": 0.12500000000000003,
+      "hit_rate": 0.7857142857142857,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "users": 14,
+      "catalog_coverage": 0.020700926094062103
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test": {
+    "movie": {
+      "ndcg_at_20": 0.13052137333206063,
+      "recall_at_20": 0.04614596185838384,
+      "precision_at_20": 0.11666666666666665,
+      "hit_rate": 0.5666666666666667,
+      "relevant_catalog_coverage": 0.702838271907416,
+      "users": 30,
+      "catalog_coverage": 0.03196490128486368
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "validation_popularity": {
+    "movie": {
+      "ndcg_at_20": 0.10865207279656279,
+      "recall_at_20": 0.04287709644488559,
+      "precision_at_20": 0.08214285714285714,
+      "hit_rate": 0.6428571428571429,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "users": 14,
+      "catalog_coverage": 0.01525331396404576
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test_popularity": {
+    "movie": {
+      "ndcg_at_20": 0.14456538688017723,
+      "recall_at_20": 0.06106635801616004,
+      "precision_at_20": 0.11666666666666665,
+      "hit_rate": 0.4666666666666667,
+      "relevant_catalog_coverage": 0.702838271907416,
+      "users": 30,
+      "catalog_coverage": 0.01989971795675337
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "validation_current": {
+    "movie": {
+      "ndcg_at_20": 0.3003153620919338,
+      "recall_at_20": 0.15305074346788958,
+      "precision_at_20": 0.2642857142857143,
+      "hit_rate": 0.9285714285714286,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "users": 14,
+      "catalog_coverage": 0.02978027964408934
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test_current": {
+    "movie": {
+      "ndcg_at_20": 0.34805813814488623,
+      "recall_at_20": 0.15240946582981757,
+      "precision_at_20": 0.285,
+      "hit_rate": 0.8666666666666667,
+      "relevant_catalog_coverage": 0.702838271907416,
+      "users": 30,
+      "catalog_coverage": 0.03854591037292385
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "approved_media": [],
+  "blocked_media": {
+    "movie": [
+      "Fewer than 50 eligible users in validation or held-out window",
+      "validation: NDCG gain over both baselines is below 0.005",
+      "held_out: NDCG gain over both baselines is below 0.005"
+    ],
+    "tv": [
+      "Fewer than 50 eligible users in validation or held-out window",
+      "validation: NDCG gain over both baselines is below 0.005",
+      "held_out: NDCG gain over both baselines is below 0.005"
+    ]
+  },
+  "protocol": "Global temporal 70/15/15; ties in later windows; select configuration independently per media on validation only; refit on development before held-out evaluation; all seen titles excluded; at least three prior positives per media; zero-result users included; weighted similarities require two shared users and shrinkage=5; minimum 50 users per media/window and NDCG gain >=0.005 over popularity and shipped graph. TMDB live retrieval is not evaluated by this offline protocol.",
+  "reference_provenance": "Retrospective shipped-artifact comparator; a strictly historical training cutoff is not established for the shipped graph.",
+  "limitations": [
+    "Public MovieLens ratings are not consented application feedback.",
+    "Only 14 validation and 30 held-out movie users qualify; no TV users are present.",
+    "The selected model loses to popularity in the held-out window; no promotion or production-accuracy improvement is justified.",
+    "These metrics use a different protocol from ml/metrics/temporal-evaluation.json and are not directly comparable.",
+    "The shipped graph lacks verified historical training provenance and is not a leakage-free MovieLens baseline."
+  ]
+}

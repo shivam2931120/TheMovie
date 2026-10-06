@@ -4,6 +4,32 @@ A modern Next.js movie catalogue application powered by **TMDB**, with Clerk aut
 
 ## Features
 
+### Tracking and discovery
+
+- **Episode tracking:** season and episode checkboxes, aired-season actions, progress, and the next unwatched aired episode. Specials are tracked separately.
+- **Better search:** shareable query/filter/page URLs, keyboard autocomplete, pagination, and account-scoped recent searches.
+- **Recommendation refresh:** fresh TMDB movie/TV candidates, weighted model blending,
+  smoothed rating quality, compact taste controls, and deduplicated personal rows.
+- **Measured learning:** `npm run ml:status` reports feedback readiness. Training
+  compares SVD and item cosine on chronological windows and blocks unsupported
+  promotions. See [ML documentation](ml/README.md).
+- **Watch diary:** dated movie/TV viewings, rewatches, ratings, private notes, editing, monthly filters, and viewing statistics at `/diary`.
+- **List management:** descriptions, filtering/sorting, manual ordering, bulk removal, and copying or moving selected titles between lists.
+- **Recommendation controls:** hide watched titles, dismiss/restore suggestions, adjust variety, and view recommendation reasons.
+
+The recommendation endpoint reranks the existing movie model using weighted ratings,
+diary entries, saved titles, browsing, favorite genres, and negative feedback.
+TV suggestions use personal taste and TMDB candidates rather than MovieLens movie IDs. The corrected
+offline experiment did not improve on the existing baseline; the deployed model
+artifacts remain unchanged. See [ML evaluation and results](ml/README.md).
+
+Account features now persist in PostgreSQL with account-scoped local recovery,
+legacy Clerk migration, revision conflict detection, and revocable shared lists.
+Opt-in feedback supports movie/TV model training; TV suggestions also rank TMDB
+candidates using personal taste and episode progress. See
+[database and feedback setup](docs/DATABASE_AND_FEEDBACK.md) for migration,
+consent controls, private exports, and measured-model promotion.
+
 ✨ **Movie Discovery**
 - Search movies by title
 - Browse with genre, year, and rating filters
@@ -12,7 +38,7 @@ A modern Next.js movie catalogue application powered by **TMDB**, with Clerk aut
 🎬 **Movie Management**
 - Add movies to your watchlist
 - Mark movies as watched
-- Persistent storage with Clerk user metadata
+- PostgreSQL account storage with device recovery and legacy Clerk migration
 
 🔐 **Authentication**
 - Secure sign-in/sign-up with Clerk
@@ -39,9 +65,9 @@ A modern Next.js movie catalogue application powered by **TMDB**, with Clerk aut
 ### 1. Clone and Install
 
 ```bash
-git clone <your-repo>
-cd movie-catalogue
-npm install
+git clone https://github.com/shivam2931120/TheMovie.git
+cd TheMovie
+npm ci
 ```
 
 ### 2. Get API Keys
@@ -69,7 +95,7 @@ Create `.env.local`:
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key_here
 NEXT_PUBLIC_TMDB_API_KEY=your_tmdb_key_here
 NEXT_PUBLIC_OMDB_API_KEY=your_omdb_key_here
-# Optional, only for Clerk server-side auth/proxy features
+# Required for revocable shared-list links and Clerk server-side features
 CLERK_SECRET_KEY=your_clerk_secret_key_here
 ```
 
@@ -130,7 +156,10 @@ Add environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_TMDB_API_KEY`
 - `NEXT_PUBLIC_OMDB_API_KEY` (optional)
 - FM-DB does not require an API key; it is used automatically as an optional fallback
-- `CLERK_SECRET_KEY` (optional, only for Clerk server-side auth/proxy features)
+- `CLERK_SECRET_KEY` (required for account sync and revocable shared lists; must match the publishable key's Clerk instance)
+- `DATABASE_URL` (server-only PostgreSQL connection; apply `npm run db:migrate`)
+- `CLERK_WEBHOOK_SIGNING_SECRET` (required for verified account deletion cleanup)
+- `ML_EXPORT_SECRET` (private stable key for offline feedback exports)
 
 ### Build for Production
 
@@ -138,6 +167,19 @@ Add environment variables in Vercel dashboard:
 npm run build
 npm start
 ```
+
+### Validation
+
+```bash
+npm test
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+The unit tests cover search state, list transfers/order, diary dates/statistics,
+snapshot revisions, and recommendation ranking. Real TMDB responses and Clerk
+account synchronization require configured credentials and separate runtime checks.
 
 ## Clerk Configuration
 

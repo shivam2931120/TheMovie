@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useClerk, useUser } from "@clerk/nextjs";
 import { Check, Save, Star, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { useRatings } from "@/context/ReviewContext";
@@ -23,6 +23,11 @@ interface UserRatingPanelProps {
 }
 
 export function UserRatingPanel({ item, type }: UserRatingPanelProps) {
+    const {user}=useUser();
+    return <RatingPanelForAccount key={`${user?.id||'guest'}:${type}:${item.id}`} item={item} type={type}/>;
+}
+
+function RatingPanelForAccount({ item, type }: UserRatingPanelProps) {
     const { openSignIn } = useClerk();
     const { getRatingForItem, upsertRating, deleteRatingForItem } = useRatings() as any;
     const savedRating = getRatingForItem(item.id, type);
@@ -32,6 +37,12 @@ export function UserRatingPanel({ item, type }: UserRatingPanelProps) {
     useEffect(() => {
         setRating(savedRating?.rating || 0);
     }, [savedRating?.id, savedRating?.rating]);
+
+    useEffect(()=>{
+        if(!saved)return;
+        const timer=window.setTimeout(()=>setSaved(false),1400);
+        return ()=>window.clearTimeout(timer);
+    },[saved]);
 
     const ratingLabel = useMemo(() => {
         if (!rating) return "Not rated";
@@ -45,7 +56,6 @@ export function UserRatingPanel({ item, type }: UserRatingPanelProps) {
         if (!nextRating) return;
         await upsertRating({ ...item, type }, nextRating);
         setSaved(true);
-        window.setTimeout(() => setSaved(false), 1400);
     };
 
     const handleDelete = async () => {
@@ -89,6 +99,7 @@ export function UserRatingPanel({ item, type }: UserRatingPanelProps) {
                                             : "border-white/10 bg-white/5 text-text-muted hover:border-white/30 hover:text-white"
                                     )}
                                     aria-label={`Rate ${value} out of 10`}
+                                    aria-pressed={value === rating}
                                 >
                                     {value}
                                 </button>

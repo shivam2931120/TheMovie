@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Wifi, WifiOff, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -8,30 +8,39 @@ export function ServiceWorkerRegistration() {
     const [isOffline, setIsOffline] = useState(false);
     const [showOfflineBanner, setShowOfflineBanner] = useState(false);
     const [updateAvailable, setUpdateAvailable] = useState(false);
+    const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+    const reloadAfterUpdate = useRef(false);
 
     useEffect(() => {
         let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+        const handleControllerChange = () => {
+            if (reloadAfterUpdate.current) window.location.reload();
+        };
 
         // Register service worker
         if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
             navigator.serviceWorker
                 .register("/sw.js")
                 .then((registration) => {
-                    // Check for updates periodically
+                    registrationRef.current = registration;
+                    const showWaitingWorker = () => {
+                        if (registration.waiting && navigator.serviceWorker.controller) setUpdateAvailable(true);
+                    };
+                    showWaitingWorker();
                     registration.addEventListener("updatefound", () => {
                         const newWorker = registration.installing;
                         if (newWorker) {
                             newWorker.addEventListener("statechange", () => {
-                                if (newWorker.state === "activated") {
-                                    setUpdateAvailable(true);
+                                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                                    showWaitingWorker();
                                 }
                             });
                         }
                     });
 
-                    // Periodic cache cleanup
                     cleanupInterval = setInterval(() => {
                         navigator.serviceWorker.controller?.postMessage("CLEANUP");
+                        void registration.update().catch(() => {});
                     }, 60 * 60 * 1000); // Every hour
                 })
                 .catch(() => {
@@ -53,10 +62,12 @@ export function ServiceWorkerRegistration() {
 
         window.addEventListener("online", handleOnline);
         window.addEventListener("offline", handleOffline);
+        navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
 
         return () => {
             window.removeEventListener("online", handleOnline);
             window.removeEventListener("offline", handleOffline);
+            navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
             if (cleanupInterval) clearInterval(cleanupInterval);
         };
     }, []);
@@ -99,7 +110,10 @@ export function ServiceWorkerRegistration() {
                             <button
                                 onClick={() => {
                                     setUpdateAvailable(false);
-                                    window.location.reload();
+                                    const waitingWorker = registrationRef.current?.waiting;
+                                    if (!waitingWorker) return;
+                                    reloadAfterUpdate.current = true;
+                                    waitingWorker.postMessage({ type: "SKIP_WAITING" });
                                 }}
                                 className="px-4 py-1.5 bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold rounded-lg transition-all"
                             >

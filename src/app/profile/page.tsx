@@ -11,7 +11,7 @@ import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
 import { MovieCard } from "@/components/MovieCard";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
+import { useProfilePreferences } from "@/context/ProfilePreferencesContext";
 import { useRatings } from "@/context/ReviewContext";
 
 // Genre name mapping for TMDB IDs
@@ -27,24 +27,6 @@ const GENRE_MAP: Record<number, string> = {
 const getPosterSrc = (path?: string | null, size = "w92") => {
     if (!path) return null;
     return path.startsWith("http") ? path : `https://image.tmdb.org/t/p/${size}${path}`;
-};
-
-const readLocalProfilePreferences = () => {
-    const savedBio = localStorage.getItem("user_bio") || "";
-    let savedGenres: string[] = [];
-
-    try {
-        savedGenres = JSON.parse(localStorage.getItem("user_favorite_genres") || "[]");
-    } catch {
-        localStorage.removeItem("user_favorite_genres");
-    }
-
-    return { bio: savedBio, favoriteGenres: savedGenres };
-};
-
-const clearLocalProfilePreferences = () => {
-    localStorage.removeItem("user_bio");
-    localStorage.removeItem("user_favorite_genres");
 };
 
 const getRatingGenreNames = (rating: any) => {
@@ -71,6 +53,11 @@ const getRatingGenreNames = (rating: any) => {
 };
 
 export default function ProfilePage() {
+    const { user, isLoaded } = useUser();
+    return <ProfileContent key={isLoaded ? user?.id || "guest" : "loading"} />;
+}
+
+function ProfileContent() {
     const { isLoaded, isSignedIn, user } = useUser();
     const { openUserProfile } = useClerk();
     const { items } = useContext(WatchlistContext) as any;
@@ -82,64 +69,9 @@ export default function ProfilePage() {
     const [activeTab, setActiveTab] = useState<'watchlist' | 'watched' | 'activity'>('watchlist');
     const [favoriteGenres, setFavoriteGenres] = useState<string[]>([]);
 
-    useEffect(() => {
-        if (!isLoaded || typeof window === 'undefined') return;
-
-        const localPreferences = readLocalProfilePreferences();
-        const metadataPreferences = isSignedIn && user
-            ? (user.unsafeMetadata?.profilePreferences as { bio?: string; favoriteGenres?: string[] } | undefined)
-            : undefined;
-
-        const metadataGenres = Array.isArray(metadataPreferences?.favoriteGenres)
-            ? metadataPreferences.favoriteGenres
-            : [];
-        const mergedGenres = [...new Set([...metadataGenres, ...localPreferences.favoriteGenres])].slice(0, 5);
-        const nextBio = metadataPreferences?.bio ?? localPreferences.bio;
-        const nextGenres = isSignedIn && user ? mergedGenres : localPreferences.favoriteGenres;
-
-        setBio(nextBio);
-        setFavoriteGenres(nextGenres);
-
-        if (isSignedIn && user && (localPreferences.bio || localPreferences.favoriteGenres.length > 0)) {
-            const needsMerge = metadataPreferences?.bio !== nextBio
-                || JSON.stringify(metadataGenres) !== JSON.stringify(nextGenres);
-
-            if (needsMerge) {
-                void saveUnsafeMetadata(user, (current) => ({
-                    ...current,
-                    profilePreferences: {
-                        ...((current.profilePreferences as Record<string, unknown> | undefined) || {}),
-                        bio: nextBio,
-                        favoriteGenres: nextGenres,
-                    },
-                })).then(clearLocalProfilePreferences).catch((error) => {
-                    console.error("Failed to merge guest profile preferences into Clerk:", error);
-                });
-            } else {
-                clearLocalProfilePreferences();
-            }
-        }
-    }, [isLoaded, isSignedIn, user]);
-
-    const saveProfilePreferences = (nextBio: string, nextGenres: string[]) => {
-        if (isSignedIn && user) {
-            void saveUnsafeMetadata(user, (current) => ({
-                ...current,
-                profilePreferences: {
-                    ...((current.profilePreferences as Record<string, unknown> | undefined) || {}),
-                    bio: nextBio,
-                    favoriteGenres: nextGenres,
-                },
-            })).catch((error) => {
-                console.error("Failed to save profile preferences to Clerk:", error);
-                localStorage.setItem("user_bio", nextBio);
-                localStorage.setItem("user_favorite_genres", JSON.stringify(nextGenres));
-            });
-        } else {
-            localStorage.setItem("user_bio", nextBio);
-            localStorage.setItem("user_favorite_genres", JSON.stringify(nextGenres));
-        }
-    };
+    const { preferences, setPreferences, status: profileStatus } = useProfilePreferences();
+    useEffect(() => { setBio(preferences.bio); setFavoriteGenres(preferences.favoriteGenres); setIsEditingBio(false); }, [preferences]);
+    const saveProfilePreferences = (nextBio: string, nextGenres: string[]) => setPreferences({bio:nextBio,favoriteGenres:nextGenres});
 
     const saveBio = () => {
         setIsEditingBio(false);

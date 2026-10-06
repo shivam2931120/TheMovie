@@ -1,75 +1,19 @@
 "use client";
 
-import { createContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
-import { saveUnsafeMetadata } from "@/lib/clerkMetadata";
-import { clearStoredKeys, hasGuestMergeChanges, mergeRecentItems, readStoredJson } from "@/lib/guestDataMerge";
+import { createContext, useCallback, useMemo } from "react";
+import { useAccountFeature } from "@/lib/useAccountFeature";
+import { mergeRecentItems } from "@/lib/guestDataMerge";
 
 export const RecentlyViewedContext = createContext();
 
-const STORAGE_KEY = "movie_catalogue_recently_viewed_v1";
 const MAX_ITEMS = 50;
 
+const EMPTY = [];
+const normalizeRecent = value => Array.isArray(value) ? value.filter(item => item?.id).slice(0, MAX_ITEMS) : [];
+const mergeRecent = (a,b) => mergeRecentItems(a,b,MAX_ITEMS);
+
 export function RecentlyViewedProvider({ children }) {
-    const { user, isSignedIn, isLoaded } = useUser();
-    const [recentlyViewed, setRecentlyViewed] = useState([]);
-    const initialized = useRef(false);
-    const saveTimeout = useRef(null);
-
-    // Load from storage
-    useEffect(() => {
-        if (!isLoaded) return;
-        initialized.current = false;
-
-        if (isSignedIn && user) {
-            const userRecent = user.unsafeMetadata?.recentlyViewed || [];
-            const guestRecent = readStoredJson(STORAGE_KEY, []);
-            const mergedRecent = mergeRecentItems(userRecent, guestRecent, MAX_ITEMS);
-            setRecentlyViewed(mergedRecent);
-
-            if (guestRecent.length > 0 && hasGuestMergeChanges(userRecent, mergedRecent)) {
-                saveUnsafeMetadata(user, { recentlyViewed: mergedRecent }).then(() => {
-                    clearStoredKeys([STORAGE_KEY]);
-                }).catch(() => {
-                    try {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(guestRecent));
-                    } catch { /* ignore */ }
-                });
-            } else if (guestRecent.length > 0) {
-                clearStoredKeys([STORAGE_KEY]);
-            }
-        } else {
-            try {
-                setRecentlyViewed(readStoredJson(STORAGE_KEY, []));
-            } catch {
-                setRecentlyViewed([]);
-            }
-        }
-        setTimeout(() => { initialized.current = true; }, 100);
-    }, [isSignedIn, user, isLoaded]);
-
-    // Save to storage (debounced, skip initial mount)
-    useEffect(() => {
-        if (!isLoaded || !initialized.current) return;
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
-        saveTimeout.current = setTimeout(() => {
-            if (isSignedIn && user) {
-                saveUnsafeMetadata(user, { recentlyViewed }).catch(() => {
-                    try {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
-                    } catch { /* ignore */ }
-                });
-            } else {
-                try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(recentlyViewed));
-                } catch { /* ignore */ }
-            }
-        }, 1500);
-
-        return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
-    }, [recentlyViewed, isSignedIn, user, isLoaded]);
-
+    const { data: recentlyViewed, update: setRecentlyViewed, loading } = useAccountFeature("recentlyViewed", EMPTY, mergeRecent, normalizeRecent);
     const addToRecentlyViewed = useCallback((item) => {
         setRecentlyViewed((prev) => {
             // Remove if already exists
@@ -89,15 +33,15 @@ export function RecentlyViewedProvider({ children }) {
             // Keep only last MAX_ITEMS
             return [minItem, ...filtered].slice(0, MAX_ITEMS);
         });
-    }, []);
+    }, [setRecentlyViewed]);
 
     const clearRecentlyViewed = useCallback(() => {
-        setRecentlyViewed([]);
-    }, []);
+        setRecentlyViewed(() => []);
+    }, [setRecentlyViewed]);
 
     const removeFromRecentlyViewed = useCallback((id, type = 'movie') => {
         setRecentlyViewed(prev => prev.filter(item => !(item.id === id && item.type === type)));
-    }, []);
+    }, [setRecentlyViewed]);
 
     const value = useMemo(() => ({
         recentlyViewed,

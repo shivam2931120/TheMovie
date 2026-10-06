@@ -1,0 +1,121 @@
+{
+  "protocol": "Global temporal 70/15/15 split; tune on validation NDCG@20; compare selected model on untouched test; all rated items excluded; all positive test items included in recall.",
+  "positive_threshold": 4.0,
+  "min_training_positives": 3,
+  "seed": 42,
+  "svd_components": 80,
+  "recommendation_count": 20,
+  "split": {
+    "train_ratings": 70584,
+    "validation_ratings": 15126,
+    "test_ratings": 15126,
+    "validation_start_timestamp": 1376822924,
+    "test_start_timestamp": 1479542662,
+    "train_tags": 1956,
+    "development_tags": 2510
+  },
+  "environment": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1"
+  },
+  "data_sha256": {
+    "movies": "5a5f32dd9bb3797b8e728a1b98958789d2b13f294a69fdfbc5727f8a9611aa07",
+    "ratings": "aa289ca83157595d0df6aea1be6a4ded676ddc4385472e8313a8ed9805352646",
+    "tags": "92a9f8bb7916dceef6151209845788c3643f794dfa79d1feaec7121b5960399d"
+  },
+  "validation_results": [
+    {
+      "name": "raw_baseline",
+      "normalization": "raw",
+      "collab": 0.68,
+      "content": 0.32,
+      "quality": 0.04,
+      "users": 14,
+      "precision_at_20": 0.12500000000000003,
+      "recall_at_20": 0.08531075453394509,
+      "ndcg_at_20": 0.15576913025202813,
+      "hit_rate_at_20": 0.8571428571428571,
+      "coverage": 0.025368480725623584,
+      "test_positive_catalog_fraction": 0.5772727272727273
+    },
+    {
+      "name": "raw_60_40",
+      "normalization": "raw",
+      "collab": 0.6,
+      "content": 0.4,
+      "quality": 0.04,
+      "users": 14,
+      "precision_at_20": 0.12142857142857143,
+      "recall_at_20": 0.08485867496794146,
+      "ndcg_at_20": 0.1553002602547313,
+      "hit_rate_at_20": 0.8571428571428571,
+      "coverage": 0.025368480725623584,
+      "test_positive_catalog_fraction": 0.5772727272727273
+    },
+    {
+      "name": "centered_68_32",
+      "normalization": "user_centered",
+      "collab": 0.68,
+      "content": 0.32,
+      "quality": 0.04,
+      "users": 14,
+      "precision_at_20": 0.08571428571428573,
+      "recall_at_20": 0.07489671592314681,
+      "ndcg_at_20": 0.12007321498035953,
+      "hit_rate_at_20": 0.6428571428571429,
+      "coverage": 0.024376417233560092,
+      "test_positive_catalog_fraction": 0.5772727272727273
+    },
+    {
+      "name": "centered_60_40",
+      "normalization": "user_centered",
+      "collab": 0.6,
+      "content": 0.4,
+      "quality": 0.04,
+      "users": 14,
+      "precision_at_20": 0.09285714285714287,
+      "recall_at_20": 0.07866715433106812,
+      "ndcg_at_20": 0.13343370416209796,
+      "hit_rate_at_20": 0.7142857142857143,
+      "coverage": 0.025085034013605442,
+      "test_positive_catalog_fraction": 0.5772727272727273
+    }
+  ],
+  "selected_on_validation": "raw_baseline",
+  "test_results": [
+    {
+      "name": "raw_baseline",
+      "normalization": "raw",
+      "collab": 0.68,
+      "content": 0.32,
+      "quality": 0.04,
+      "users": 30,
+      "precision_at_20": 0.085,
+      "recall_at_20": 0.041064144599899696,
+      "ndcg_at_20": 0.09227716989043282,
+      "hit_rate_at_20": 0.5,
+      "coverage": 0.03310125809209723,
+      "test_positive_catalog_fraction": 0.7401315789473685
+    }
+  ],
+  "paired_bootstrap": {
+    "users": 30,
+    "ndcg_mean_difference": 0.0,
+    "ndcg_difference_95pct_ci": [
+      0.0,
+      0.0
+    ],
+    "samples": 2000
+  },
+  "deployment_recommended": false,
+  "limitations": [
+    "MovieLens Small is historical movie-only data, not this app's users or TV viewing.",
+    "Only users with three prior positive ratings and at least one future positive rating are evaluated.",
+    "Unseen catalog items lack collaborative neighbors; content cold-start coverage is not measured.",
+    "Per-user bootstrap uncertainty does not measure repeated time splits or production behavior.",
+    "Item-neighbor evaluation uses rank-voting seeds; production personalized feedback weights require their own evaluation."
+  ]
+}

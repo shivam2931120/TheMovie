@@ -9,6 +9,7 @@ import { getMovieDetails, getWatchProviders, getCollection } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { UserRatingPanel } from "@/components/UserRatingPanel";
 import { WatchProviders } from "@/components/WatchProviders";
+import { DiaryEntryForm } from "@/components/DiaryEntryForm";
 import YouTube from "react-youtube";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
@@ -46,48 +47,46 @@ export default function MovieDetailsPage() {
     }, [id]);
 
     useEffect(() => {
+        let cancelled = false;
         async function loadDetails() {
-            if (id) {
-                try {
-                    const data = await getMovieDetails(id as string);
-                    if (!data?.id) throw new Error("Movie details unavailable.");
-                    const providers = await getWatchProviders(id as string, 'movie');
-                    
-                    const myProviders = providers?.results?.[selectedRegion] || providers?.results?.['US'];
-                    const movieData = { ...data, providers: myProviders, allProviders: providers?.results };
-                    setMovie(movieData);
-                    setFmdbMedia(null);
-                    setFmdbPoster(null);
-
-                    if (data?.belongs_to_collection?.id) {
-                        try {
-                            const collectionData = await getCollection(data.belongs_to_collection.id);
-                            setCollection(collectionData);
-                        } catch (err) {
-                            setCollection(null);
-                        }
-                    }
-
-                    if (addToRecentlyViewed) {
-                        addToRecentlyViewed({
-                            id: movieData.id,
-                            title: movieData.title,
-                            poster_path: movieData.poster_path,
-                            vote_average: movieData.vote_average,
-                            release_date: movieData.release_date,
-                            type: 'movie'
-                        });
-                    }
-
-                    setLoading(false);
-                } catch (error: any) {
-                    setError(error?.message || 'Failed to load movie');
-                    setLoading(false);
+            setLoading(true);
+            setError(null);
+            setMovie(null);
+            setCollection(null);
+            setFmdbMedia(null);
+            setFmdbPoster(null);
+            if (!id) { setLoading(false); return; }
+            try {
+                const [data, providers] = await Promise.all([
+                    getMovieDetails(id as string),
+                    getWatchProviders(id as string, 'movie'),
+                ]);
+                if (!data?.id) throw new Error("Movie details unavailable.");
+                if (cancelled) return;
+                const movieData = { ...data, allProviders: providers?.results || {} };
+                setMovie(movieData);
+                if (data.belongs_to_collection?.id) {
+                    getCollection(data.belongs_to_collection.id)
+                        .then((collectionData) => { if (!cancelled) setCollection(collectionData?.id ? collectionData : null); })
+                        .catch(() => { if (!cancelled) setCollection(null); });
                 }
+                addToRecentlyViewed?.({
+                    id: movieData.id,
+                    title: movieData.title,
+                    poster_path: movieData.poster_path,
+                    vote_average: movieData.vote_average,
+                    release_date: movieData.release_date,
+                    type: 'movie'
+                });
+            } catch (loadError: any) {
+                if (!cancelled) setError(loadError?.message || 'Failed to load movie');
+            } finally {
+                if (!cancelled) setLoading(false);
             }
         }
         loadDetails();
-    }, [id, addToRecentlyViewed, selectedRegion]);
+        return () => { cancelled = true; };
+    }, [id, addToRecentlyViewed]);
 
     useEffect(() => {
         let cancelled = false;
@@ -133,7 +132,7 @@ export default function MovieDetailsPage() {
     if (!movie) return (
         <div className="min-h-screen bg-bg-main flex items-center justify-center">
             <div className="text-center">
-                <p className="text-white text-3xl font-display mb-4">Movie not found</p>
+                <p className="text-white text-3xl font-display mb-4">{error || "Movie not found"}</p>
                 <Link href="/movies" className="text-accent-primary hover:underline">← Back to Discover</Link>
             </div>
         </div>
@@ -158,7 +157,7 @@ export default function MovieDetailsPage() {
     
     const similar = movie.similar?.results?.slice(0, 10) || [];
     const keywords = movie.keywords?.keywords || [];
-    const availableRegions = movie.allProviders ? Object.keys(movie.allProviders).sort() : ['US'];
+    const availableRegions = [...new Set([selectedRegion, ...Object.keys(movie.allProviders || {})])].sort();
 
     return (
         <main className="min-h-screen bg-bg-main relative">
@@ -416,9 +415,13 @@ export default function MovieDetailsPage() {
                     {/* Right Column (Sidebar) */}
                     <div className="lg:col-span-4 space-y-8">
                         {/* Providers */}
+                        <section className="rounded-xl border border-white/10 bg-bg-card p-5">
+                            <h3 className="mb-3 text-lg font-bold text-white">Watch diary</h3>
+                            <DiaryEntryForm key={movie.id} item={{ ...movie, type: "movie" }} />
+                        </section>
                         <div className="bg-bg-surface/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-elevated">
                             <WatchProviders
-                                providers={movie.providers}
+                                providers={movie.allProviders?.[selectedRegion]}
                                 availableRegions={availableRegions}
                                 selectedRegion={selectedRegion}
                                 onRegionChange={setSelectedRegion}

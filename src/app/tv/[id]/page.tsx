@@ -8,7 +8,9 @@ import { Play, Plus, Star, Calendar, X, Check, Tv, Tag, List as ListIcon, Info }
 import { getTVDetails, getWatchProviders } from "@/api/tmdb";
 import { MovieCard } from "@/components/MovieCard";
 import { UserRatingPanel } from "@/components/UserRatingPanel";
+import { EpisodeTracker } from "@/components/EpisodeTracker";
 import { WatchProviders } from "@/components/WatchProviders";
+import { DiaryEntryForm } from "@/components/DiaryEntryForm";
 import YouTube from "react-youtube";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
@@ -42,36 +44,38 @@ export default function TVDetailsPage() {
     }, [id]);
 
     useEffect(() => {
+        let cancelled = false;
         async function loadDetails() {
-            if (id) {
-                try {
-                    const data = await getTVDetails(id as string);
-                    if (!data?.id) throw new Error("TV details unavailable.");
-                    const providers = await getWatchProviders(id as string, 'tv');
-                    
-                    const myProviders = providers?.results?.[selectedRegion] || providers?.results?.['US'];
-                    const tvData = { ...data, providers: myProviders, allProviders: providers?.results };
-                    setTv(tvData);
-
-                    if (addToRecentlyViewed) {
-                        addToRecentlyViewed({
-                            id: tvData.id,
-                            name: tvData.name,
-                            poster_path: tvData.poster_path,
-                            vote_average: tvData.vote_average,
-                            first_air_date: tvData.first_air_date,
-                            type: 'tv'
-                        });
-                    }
-                    setLoading(false);
-                } catch (error: any) {
-                    setError(error?.message || 'Failed to load TV show');
-                    setLoading(false);
-                }
+            setLoading(true);
+            setError(null);
+            setTv(null);
+            if (!id) { setLoading(false); return; }
+            try {
+                const [data, providers] = await Promise.all([
+                    getTVDetails(id as string),
+                    getWatchProviders(id as string, 'tv'),
+                ]);
+                if (!data?.id) throw new Error("TV details unavailable.");
+                if (cancelled) return;
+                const tvData = { ...data, allProviders: providers?.results || {} };
+                setTv(tvData);
+                addToRecentlyViewed?.({
+                    id: tvData.id,
+                    name: tvData.name,
+                    poster_path: tvData.poster_path,
+                    vote_average: tvData.vote_average,
+                    first_air_date: tvData.first_air_date,
+                    type: 'tv'
+                });
+            } catch (loadError: any) {
+                if (!cancelled) setError(loadError?.message || 'Failed to load TV show');
+            } finally {
+                if (!cancelled) setLoading(false);
             }
         }
         loadDetails();
-    }, [id, addToRecentlyViewed, selectedRegion]);
+        return () => { cancelled = true; };
+    }, [id, addToRecentlyViewed]);
 
     const handleWatchlist = () => {
         if (!tv) return;
@@ -100,7 +104,7 @@ export default function TVDetailsPage() {
     if (!tv) return (
         <div className="min-h-screen bg-bg-main flex items-center justify-center">
             <div className="text-center">
-                <p className="text-white text-3xl font-display mb-4">TV Show not found</p>
+                <p className="text-white text-3xl font-display mb-4">{error || "TV Show not found"}</p>
                 <Link href="/discover" className="text-accent-primary hover:underline">← Back to Discover</Link>
             </div>
         </div>
@@ -117,7 +121,7 @@ export default function TVDetailsPage() {
     
     const similar = tv.similar?.results?.slice(0, 10) || [];
     const keywords = tv.keywords?.results || [];
-    const availableRegions = tv.allProviders ? Object.keys(tv.allProviders).sort() : ['US'];
+    const availableRegions = [...new Set([selectedRegion, ...Object.keys(tv.allProviders || {})])].sort();
 
     return (
         <main className="min-h-screen bg-bg-main relative">
@@ -219,6 +223,50 @@ export default function TVDetailsPage() {
                                 >
                                     {isWatchlisted ? <Check size={20} /> : <Plus size={20} />}
                                 </button>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowListDropdown((open) => !open)}
+                                        className="flex items-center justify-center p-4 rounded-full border border-white/10 bg-white/5 text-white transition-all hover:scale-105 hover:bg-white/10"
+                                        aria-label="Add show to a list"
+                                        aria-expanded={showListDropdown}
+                                    >
+                                        <ListIcon size={20} />
+                                    </button>
+                                    {showListDropdown && (
+                                        <div className="absolute left-0 top-full z-50 mt-3 w-72 rounded-2xl border border-white/10 bg-bg-surface/95 p-4 shadow-elevated backdrop-blur-xl">
+                                            <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                                                <h3 className="text-sm font-bold text-white">Add to List</h3>
+                                                <button type="button" onClick={() => setShowListDropdown(false)} aria-label="Close lists" className="text-text-muted hover:text-white"><X size={16} /></button>
+                                            </div>
+                                            <div className="mb-3 max-h-48 space-y-1 overflow-y-auto">
+                                                {lists.map((list: any) => {
+                                                    const inList = isInList(list.id, tv.id, "tv");
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            key={list.id}
+                                                            onClick={() => handleListToggle(list.id)}
+                                                            className="flex w-full items-center justify-between rounded-lg p-3 text-left text-sm text-white hover:bg-white/10"
+                                                        >
+                                                            {list.name}
+                                                            {inList && <Check size={16} className="text-accent-primary" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <form onSubmit={handleCreateList} className="flex gap-2">
+                                                <input
+                                                    value={newListName}
+                                                    onChange={(event) => setNewListName(event.target.value)}
+                                                    placeholder="Create new list"
+                                                    className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-accent-primary focus:outline-none"
+                                                />
+                                                <button type="submit" disabled={!newListName.trim()} aria-label="Create list" className="rounded-lg bg-accent-primary px-3 text-white disabled:opacity-50"><Plus size={18} /></button>
+                                            </form>
+                                        </div>
+                                    )}
+                                </div>
                             </SignedIn>
                         </div>
                     </div>
@@ -291,8 +339,12 @@ export default function TVDetailsPage() {
                     </div>
 
                     <div className="lg:col-span-4 space-y-8">
+                        <section className="rounded-xl border border-white/10 bg-bg-card p-5">
+                            <h3 className="mb-3 text-lg font-bold text-white">Watch diary</h3>
+                            <DiaryEntryForm key={tv.id} item={{ ...tv, type: "tv" }} />
+                        </section>
                         <div className="bg-bg-surface/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-elevated">
-                            <WatchProviders providers={tv.providers} availableRegions={availableRegions} selectedRegion={selectedRegion} onRegionChange={setSelectedRegion} />
+                            <WatchProviders providers={tv.allProviders?.[selectedRegion]} availableRegions={availableRegions} selectedRegion={selectedRegion} onRegionChange={setSelectedRegion} />
                         </div>
 
                         <div className="bg-bg-surface/50 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-elevated">
@@ -329,6 +381,10 @@ export default function TVDetailsPage() {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className="mt-12">
+                    <EpisodeTracker key={tv.id} show={tv} />
                 </div>
 
                 <div className="mt-24 space-y-24">

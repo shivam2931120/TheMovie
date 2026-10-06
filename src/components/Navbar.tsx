@@ -16,6 +16,7 @@ export function Navbar() {
     const [searchQuery, setSearchQuery] = useState("");
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const dialogRef = useRef<HTMLDialogElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
     const router = useRouter();
@@ -74,6 +75,16 @@ export function Navbar() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [showSearch]);
 
+    useEffect(() => {
+        if (!showSearch) return;
+        const previousFocus = document.activeElement as HTMLElement | null;
+        const previousOverflow = document.body.style.overflow;
+        const dialog = dialogRef.current;
+        dialog?.showModal();
+        document.body.style.overflow = "hidden";
+        return () => { dialog?.close(); document.body.style.overflow = previousOverflow; previousFocus?.focus(); };
+    }, [showSearch]);
+
     const handleSearchCheck = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
@@ -89,12 +100,14 @@ export function Navbar() {
         { name: "Movies", href: "/movies", icon: Film },
         { name: "TV", href: "/tv", icon: Tv },
         { name: "Discover", href: "/discover", icon: Compass },
+        { name: "Diary", href: "/diary", icon: Film },
     ];
 
     return (
         <>
+            <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-bg-main/90 p-3"><Link href="/" className="font-display text-white font-bold">THEMOVIE</Link><SignedOut><Link href="/sign-in" className="min-h-11 inline-flex items-center px-4 text-accent-primary">Sign in</Link></SignedOut><SignedIn><Link href="/lists" className="min-h-11 inline-flex items-center px-4 text-accent-primary">My lists</Link></SignedIn></div>
             {/* Desktop & Tablet Floating Navbar */}
-            <header className="fixed top-0 left-0 right-0 z-50 pt-4 sm:pt-6 pointer-events-none px-4 hidden sm:block">
+            <header className="fixed top-0 left-0 right-0 z-50 pt-4 sm:pt-6 pointer-events-none px-4 hidden lg:block">
                 <div className="container mx-auto max-w-4xl flex justify-center">
                     <nav
                         className={clsx(
@@ -119,6 +132,7 @@ export function Navbar() {
                                     <Link
                                         key={link.name}
                                         href={link.href}
+                                        aria-current={isActive ? "page" : undefined}
                                         className={clsx(
                                             "relative px-4 py-2 text-sm font-medium transition-colors outline-none rounded-full",
                                             isActive ? "text-white" : "text-text-secondary hover:text-white hover:bg-white/5",
@@ -172,7 +186,7 @@ export function Navbar() {
             </header>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-surface/90 backdrop-blur-xl border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
+            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-surface/90 backdrop-blur-xl border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-around h-16">
                     {navLinks.map((link) => {
                         const isActive = pathname === link.href || (link.href !== "/" && pathname?.startsWith(link.href));
@@ -180,6 +194,7 @@ export function Navbar() {
                             <Link
                                 key={link.name}
                                 href={link.href}
+                                aria-current={isActive ? "page" : undefined}
                                 className={clsx(
                                     "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
                                     isActive ? "text-accent-primary" : "text-text-secondary hover:text-white"
@@ -215,18 +230,23 @@ export function Navbar() {
             {/* Cinematic Search Overlay */}
             <AnimatePresence>
                 {showSearch && (
-                    <motion.div
+                    <motion.dialog
+                        ref={dialogRef}
+                        aria-label="Search movies and TV shows"
+                        onCancel={() => setShowSearch(false)}
+                        onClose={() => setShowSearch(false)}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="fixed inset-0 z-[100] bg-bg-main/80 backdrop-blur-2xl flex flex-col pt-[20vh] items-center px-4"
+                        className="m-0 max-w-none max-h-none w-screen h-dvh fixed inset-0 z-[100] bg-bg-main/80 backdrop-blur-2xl flex flex-col pt-[20vh] items-center px-4"
                     >
                         <div ref={wrapperRef} className="w-full max-w-2xl relative">
                             <form onSubmit={handleSearchCheck} className="relative w-full">
                                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-text-muted" size={24} />
                                 <input
-                                    type="text"
+                                    type="search"
+                                    aria-label="Search movies and TV shows"
                                     placeholder="Search movies, shows, people..."
                                     className="w-full bg-white/5 border border-white/10 rounded-full pl-16 pr-12 py-5 text-xl sm:text-2xl font-display text-white placeholder:text-text-muted focus:outline-none focus:border-accent-primary/50 focus:bg-white/10 transition-all shadow-2xl"
                                     autoFocus
@@ -236,6 +256,7 @@ export function Navbar() {
                                 <button
                                     type="button"
                                     onClick={() => setShowSearch(false)}
+                                    aria-label="Close search"
                                     className="absolute right-6 top-1/2 -translate-y-1/2 p-1 text-text-muted hover:text-white transition-colors rounded-full focus-visible:ring-2 focus-visible:ring-accent-primary"
                                 >
                                     <X size={24} />
@@ -299,7 +320,7 @@ export function Navbar() {
                             )}
                         </div>
                         <p className="mt-8 text-sm text-text-muted font-medium">Press <kbd className="px-2 py-1 bg-white/10 rounded text-xs mx-1">ESC</kbd> to close</p>
-                    </motion.div>
+                    </motion.dialog>
                 )}
             </AnimatePresence>
         </>

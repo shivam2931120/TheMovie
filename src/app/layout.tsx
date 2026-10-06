@@ -24,6 +24,7 @@ import { Providers } from "@/components/Providers";
 import { EasterEgg } from "@/components/EasterEgg";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { AccountStorageNotice } from "@/components/AccountStorageNotice";
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -68,10 +69,12 @@ export default function RootLayout({
                 >
                     <Providers>
                         <EasterEgg />
+                        <a href="#main-content" className="skip-link">Skip to content</a>
                         <Navbar />
-                        {children}
+                        <div id="main-content" tabIndex={-1}>{children}</div>
                         <ScrollToTop />
                         <ServiceWorkerRegistration />
+                        <AccountStorageNotice />
                     </Providers>
                 </ClerkProvider>
             </body>
