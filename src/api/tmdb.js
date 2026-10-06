@@ -73,7 +73,7 @@ api.interceptors.request.use((config) => {
 
 // Robust Error Handling Wrapper
 const fetchFromApi = async (endpoint, params = {}, options = {}) => {
-    const { cache = true, cacheTtlMs = REQUEST_CACHE_TTL_MS } = options;
+    const { cache = true, cacheTtlMs = REQUEST_CACHE_TTL_MS, signal, throwOnError = false } = options;
     try {
         const apiKey = getApiKey();
         if (!apiKey) {
@@ -81,10 +81,11 @@ const fetchFromApi = async (endpoint, params = {}, options = {}) => {
                 console.warn("[TMDB] Missing API key. Returning an empty response.");
                 hasWarnedMissingApiKey = true;
             }
+            if (throwOnError) throw new Error("Movie catalogue is not configured");
             return emptyResponse();
         }
 
-        const cacheKey = cache ? getCacheKey(endpoint, params) : null;
+        const cacheKey = cache && !signal ? getCacheKey(endpoint, params) + (throwOnError ? ":strict" : "") : null;
 
         if (cacheKey) {
             const cached = requestCache.get(cacheKey);
@@ -98,10 +99,14 @@ const fetchFromApi = async (endpoint, params = {}, options = {}) => {
         }
 
         let shouldCacheResponse = true;
-        const request = api.get(endpoint, { params })
-            .then(({ data }) => data || emptyResponse())
+        const request = api.get(endpoint, { params, signal })
+            .then(({ data }) => {
+                if (throwOnError && (!data || data.error || ((endpoint.startsWith('/search/') || endpoint.startsWith('/trending/') || ['/movie/popular', '/movie/now_playing', '/movie/upcoming', '/movie/top_rated'].includes(endpoint)) && !Array.isArray(data.results)))) throw new Error('Invalid catalogue response');
+                return data || emptyResponse();
+            })
             .catch((error) => {
                 shouldCacheResponse = false;
+                if (throwOnError || signal?.aborted) throw error;
                 if (error.code === 'ECONNABORTED') {
                     console.error(`[TMDB] Timeout fetching ${endpoint}`);
                 } else {
@@ -126,6 +131,7 @@ const fetchFromApi = async (endpoint, params = {}, options = {}) => {
 
         return data;
     } catch (error) {
+        if (throwOnError || signal?.aborted) throw error;
         if (error.code === 'ECONNABORTED') {
             console.error(`[TMDB] Timeout fetching ${endpoint}`);
         } else {
@@ -137,20 +143,20 @@ const fetchFromApi = async (endpoint, params = {}, options = {}) => {
 
 // --- API Functions ---
 
-export const getTrendingMovies = (timeWindow = "day") =>
-    fetchFromApi(`/trending/movie/${timeWindow}`);
+export const getTrendingMovies = (timeWindow = "day", options = {}) =>
+    fetchFromApi(`/trending/movie/${timeWindow}`, {}, options);
 
-export const getPopularMovies = (page = 1) =>
-    fetchFromApi("/movie/popular", { page });
+export const getPopularMovies = (page = 1, options = {}) =>
+    fetchFromApi("/movie/popular", { page }, options);
 
-export const getNowPlayingMovies = (page = 1) =>
-    fetchFromApi("/movie/now_playing", { page });
+export const getNowPlayingMovies = (page = 1, options = {}) =>
+    fetchFromApi("/movie/now_playing", { page }, options);
 
-export const getUpcomingMovies = (page = 1) =>
-    fetchFromApi("/movie/upcoming", { page });
+export const getUpcomingMovies = (page = 1, options = {}) =>
+    fetchFromApi("/movie/upcoming", { page }, options);
 
-export const getTopRatedMovies = (page = 1) =>
-    fetchFromApi("/movie/top_rated", { page });
+export const getTopRatedMovies = (page = 1, options = {}) =>
+    fetchFromApi("/movie/top_rated", { page }, options);
 
 export const getMovieDetails = (id) =>
     fetchFromApi(`/movie/${id}`, { append_to_response: "videos,credits,similar,images,keywords,alternative_titles,release_dates,external_ids" });
@@ -195,8 +201,8 @@ export const searchMovies = (query, page = 1) =>
 export const searchTV = (query, page = 1) =>
     fetchFromApi("/search/tv", { query, page });
 
-export const searchMulti = (query, page = 1) =>
-    fetchFromApi("/search/multi", { query, page });
+export const searchMulti = (query, page = 1, options = {}) =>
+    fetchFromApi("/search/multi", { query, page }, options);
 
 export const searchPeople = (query, page = 1) =>
     fetchFromApi("/search/person", { query, page });

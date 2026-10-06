@@ -41,7 +41,7 @@ export function WatchedProvider({ children }) {
 
   const hasWatched = useCallback((id, type = 'movie') => watched.some((m) => m.id === id && (m.type || 'movie') === type), [watched]);
 
-  const value = useMemo(() => ({ watched, addWatched, removeWatched, hasWatched }), [watched, addWatched, removeWatched, hasWatched]);
+  const value = useMemo(() => ({ watched, loading, addWatched, removeWatched, hasWatched }), [watched, loading, addWatched, removeWatched, hasWatched]);
 
   return <WatchedContext.Provider value={value}>{children}</WatchedContext.Provider>;
 }

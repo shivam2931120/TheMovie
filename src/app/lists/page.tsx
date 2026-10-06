@@ -1,5 +1,7 @@
 "use client";
 
+import { LibraryNav } from "@/components/LibraryNav";
+
 import { FormEvent, useMemo, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { ArrowDown, ArrowUp, Check, Copy, Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
@@ -143,7 +145,7 @@ export default function ListsPage() {
         setNewListName(""); setNewDescription("");
     };
     const visibleLists = lists.filter((list: any) => `${list.name} ${list.description || ""}`.toLowerCase().includes(listQuery.trim().toLowerCase()));
-    return <main className="min-h-screen bg-bg-main pb-20 pt-32 sm:pt-36"><div className="container mx-auto px-4 sm:px-6 lg:px-20">
+    return <main className="min-h-screen bg-bg-main pb-20 pt-32 sm:pt-36"><div className="container mx-auto px-4 sm:px-6 lg:px-20"><LibraryNav active="lists" />
         <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:justify-between">
             <div><h1 className="mb-2 text-3xl font-display font-bold text-white sm:text-4xl">Custom Lists</h1><p className="text-text-secondary">Organize, reorder and share your movies and shows.</p></div>
             <form onSubmit={handleCreate} className="w-full max-w-md space-y-2">

@@ -199,7 +199,7 @@ function ProfileContent() {
                         </div>
                         {/* Level Badge */}
                         {watched.length > 0 && (
-                            <div className="absolute -bottom-1 -right-1 bg-accent-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-bg-card">
+                            <div className="absolute -bottom-1 -right-1 bg-accent-surface text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-bg-card">
                                 Lvl {Math.min(Math.floor(watched.length / 5) + 1, 99)}
                             </div>
                         )}
@@ -322,7 +322,7 @@ function ProfileContent() {
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${(count / stats.maxGenreCount) * 100}%` }}
                                                 transition={{ duration: 0.8, delay: 0.1 }}
-                                                className="h-full bg-accent-primary rounded-full"
+                                                className="h-full bg-accent-surface rounded-full"
                                             />
                                         </div>
                                         <span className="text-text-muted text-xs w-6 text-right">{count}</span>
@@ -448,7 +448,7 @@ function ProfileContent() {
                                 onClick={() => toggleFavoriteGenre(genre)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                                     favoriteGenres.includes(genre)
-                                        ? "bg-accent-primary text-white"
+                                        ? "bg-accent-surface text-white"
                                         : "bg-white/5 text-text-muted hover:bg-white/10 hover:text-white"
                                 }`}
                             >
@@ -467,7 +467,7 @@ function ProfileContent() {
                             className={`pb-3 sm:pb-4 text-xs sm:text-sm font-bold transition-colors relative whitespace-nowrap capitalize ${activeTab === tab ? 'text-white' : 'text-text-muted hover:text-white'}`}
                         >
                             {tab === 'watchlist' ? 'My Watchlist' : tab === 'watched' ? 'Watched History' : 'Recent Activity'}
-                            {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent-primary rounded-t-full" />}
+                            {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-accent-surface rounded-t-full" />}
                         </button>
                     ))}
                 </div>
@@ -494,7 +494,7 @@ function ProfileContent() {
                                     <Film size={48} className="mx-auto text-text-muted mb-4 opacity-30" />
                                     <p className="text-text-secondary font-medium">Your watchlist is empty.</p>
                                     <p className="text-text-muted text-sm mt-2 mb-6">Browse movies and click the + button to add them.</p>
-                                    <Link href="/discover" className="px-5 py-2.5 bg-accent-primary hover:bg-accent-primary/90 text-white text-sm font-bold rounded-lg transition-all">
+                                    <Link href="/discover" className="px-5 py-2.5 bg-accent-surface hover:bg-accent-surface/90 text-white text-sm font-bold rounded-lg transition-all">
                                         Discover Movies
                                     </Link>
                                 </div>

@@ -95,7 +95,7 @@ function RatingPanelForAccount({ item, type }: UserRatingPanelProps) {
                                     className={clsx(
                                         "h-9 w-9 rounded-lg border text-sm font-bold transition-all",
                                         active
-                                            ? "border-accent-primary bg-accent-primary text-white"
+                                            ? "border-accent-primary bg-accent-surface text-white"
                                             : "border-white/10 bg-white/5 text-text-muted hover:border-white/30 hover:text-white"
                                     )}
                                     aria-label={`Rate ${value} out of 10`}
@@ -112,7 +112,7 @@ function RatingPanelForAccount({ item, type }: UserRatingPanelProps) {
                             type="button"
                             onClick={() => saveRating()}
                             disabled={!rating}
-                            className="inline-flex items-center gap-2 rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white transition-all hover:bg-accent-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-2 rounded-lg bg-accent-surface px-4 py-2 text-sm font-bold text-white transition-all hover:bg-accent-surface/90 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <Save size={16} />
                             Save Rating

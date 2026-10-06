@@ -680,7 +680,7 @@ function SearchContent() {
                     <div className="mt-5 flex flex-wrap gap-3">
                         <button
                             type="submit"
-                            className="inline-flex items-center gap-2 rounded-xl bg-accent-primary px-5 py-3 text-sm font-bold text-white transition-all hover:bg-accent-primary/90"
+                            className="inline-flex items-center gap-2 rounded-xl bg-accent-surface px-5 py-3 text-sm font-bold text-white transition-all hover:bg-accent-surface/90"
                         >
                             <SlidersHorizontal size={18} />
                             Search

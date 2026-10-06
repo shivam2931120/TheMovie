@@ -20,6 +20,9 @@ const nextConfig = {
         root: rootDir,
     },
     images: {
+        // TMDB already provides sized images. Serve them directly so catalogue
+        // artwork remains available when Vercel's optimizer quota is exhausted.
+        unoptimized: true,
         remotePatterns: [
             {
                 protocol: 'https',

@@ -316,7 +316,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                 <SlidersHorizontal size={18} />
                 Advanced Filters
                 {activeFiltersCount > 0 && (
-                    <span className="bg-accent-primary text-white text-xs px-2 py-0.5 rounded-full">
+                    <span className="bg-accent-surface text-white text-xs px-2 py-0.5 rounded-full">
                         {activeFiltersCount}
                     </span>
                 )}
@@ -359,7 +359,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                                 className={clsx(
                                                     "px-4 py-2 rounded-full text-sm font-medium transition-all",
                                                     selectedGenres.includes(genre.id)
-                                                        ? "bg-accent-primary text-white"
+                                                        ? "bg-accent-surface text-white"
                                                         : "bg-white/5 text-white hover:bg-white/10"
                                                 )}
                                             >
@@ -513,7 +513,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                                                 type="button"
                                                 onClick={handleSaveSearch}
                                                 disabled={!saveName.trim()}
-                                                className="px-4 py-2 bg-accent-primary hover:bg-accent-primary/90 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-40"
+                                                className="px-4 py-2 bg-accent-surface hover:bg-accent-surface/90 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-40"
                                             >
                                                 <BookmarkCheck size={16} />
                                             </button>
@@ -577,7 +577,7 @@ export function AdvancedFilters({ onApply }: AdvancedFiltersProps) {
                             </button>
                             <button
                                 onClick={applyFilters}
-                                className="flex-1 px-6 py-3 bg-accent-primary hover:bg-accent-primary/90 text-white rounded-lg font-bold transition-all"
+                                className="flex-1 px-6 py-3 bg-accent-surface hover:bg-accent-surface/90 text-white rounded-lg font-bold transition-all"
                             >
                                 Apply Filters
                             </button>

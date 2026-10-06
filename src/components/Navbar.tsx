@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { trapDialogFocus } from "@/lib/dialogFocus";
+
+import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, User, X, Home, Film, Tv, Compass } from "lucide-react";
+import { Search, User, X, Home, Film, Tv, Compass, Library } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import clsx from "clsx";
 import { usePathname, useRouter } from "next/navigation";
@@ -15,7 +17,8 @@ export function Navbar() {
     const [showSearch, setShowSearch] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [suggestions, setSuggestions] = useState<any[]>([]);
-    const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [suggestionStatus, setSuggestionStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+    const [searchRetry, setSearchRetry] = useState(0);
     const dialogRef = useRef<HTMLDialogElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const pathname = usePathname();
@@ -32,7 +35,7 @@ export function Navbar() {
     // Global keyboard shortcut for search
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "/" && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName || "")) {
+            if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName || "") && !(document.activeElement as HTMLElement | null)?.isContentEditable) {
                 e.preventDefault();
                 setShowSearch(true);
             } else if (e.key === "Escape") {
@@ -44,24 +47,23 @@ export function Navbar() {
     }, []);
 
     useEffect(() => {
-        const fetchSuggestions = async () => {
-            if (searchQuery.length > 2) {
-                const data = await searchMulti(searchQuery);
-                if (data?.results) {
-                    setSuggestions(
-                        data.results
-                            .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
-                            .slice(0, 5)
-                    );
-                }
-            } else {
-                setSuggestions([]);
+        const controller = new AbortController();
+        const query = searchQuery.trim();
+        setSuggestions([]);
+        if (!showSearch || query.length < 3) { setSuggestionStatus("idle"); return; }
+        setSuggestionStatus("loading");
+        const timeoutId = setTimeout(async () => {
+            try {
+                const data = await searchMulti(query, 1, { signal: controller.signal, throwOnError: true });
+                if (controller.signal.aborted) return;
+                setSuggestions((data?.results || []).filter((item: any) => ["movie", "tv", "person"].includes(item.media_type)).slice(0, 5));
+                setSuggestionStatus("ready");
+            } catch {
+                if (!controller.signal.aborted) setSuggestionStatus("error");
             }
-        };
-
-        const timeoutId = setTimeout(fetchSuggestions, 300);
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery]);
+        }, 300);
+        return () => { clearTimeout(timeoutId); controller.abort(); };
+    }, [searchQuery, showSearch, searchRetry]);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -97,15 +99,16 @@ export function Navbar() {
 
     const navLinks = [
         { name: "Home", href: "/", icon: Home },
-        { name: "Movies", href: "/movies", icon: Film },
-        { name: "TV", href: "/tv", icon: Tv },
         { name: "Discover", href: "/discover", icon: Compass },
-        { name: "Diary", href: "/diary", icon: Film },
+        { name: "Library", href: "/library", icon: Library },
     ];
+    const isLinkActive = (href: string) => href === "/library"
+        ? ["/library", "/lists", "/diary"].some(path => pathname === path || pathname.startsWith(path + "/"))
+        : pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
     return (
         <>
-            <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-bg-main/90 p-3"><Link href="/" className="font-display text-white font-bold">THEMOVIE</Link><SignedOut><Link href="/sign-in" className="min-h-11 inline-flex items-center px-4 text-accent-primary">Sign in</Link></SignedOut><SignedIn><Link href="/lists" className="min-h-11 inline-flex items-center px-4 text-accent-primary">My lists</Link></SignedIn></div>
+            <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-bg-main/90 p-3"><Link href="/" className="font-display text-white font-bold">THEMOVIE</Link><SignedOut><Link href="/sign-in" className="min-h-11 inline-flex items-center px-4 text-accent-primary">Sign in</Link></SignedOut><SignedIn><Link href="/library" className="min-h-11 inline-flex items-center px-4 text-accent-primary">Library</Link></SignedIn></div>
             {/* Desktop & Tablet Floating Navbar */}
             <header className="fixed top-0 left-0 right-0 z-50 pt-4 sm:pt-6 pointer-events-none px-4 hidden lg:block">
                 <div className="container mx-auto max-w-4xl flex justify-center">
@@ -127,7 +130,7 @@ export function Navbar() {
                         {/* Center Links */}
                         <div className="flex items-center gap-1">
                             {navLinks.map((link) => {
-                                const isActive = pathname === link.href || (link.href !== "/" && pathname?.startsWith(link.href));
+                                const isActive = isLinkActive(link.href);
                                 return (
                                     <Link
                                         key={link.name}
@@ -143,7 +146,7 @@ export function Navbar() {
                                         {isActive && (
                                             <motion.div
                                                 layoutId="nav-indicator"
-                                                className="absolute inset-x-0 -bottom-px h-px bg-accent-primary glow"
+                                                className="absolute inset-x-0 -bottom-px h-px bg-accent-surface glow"
                                                 initial={false}
                                                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                             />
@@ -175,7 +178,7 @@ export function Navbar() {
                             <SignedOut>
                                 <Link
                                     href="/sign-in"
-                                    className="px-4 py-1.5 rounded-full bg-accent-primary text-white text-xs font-bold transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface outline-none"
+                                    className="px-4 py-1.5 rounded-full bg-accent-surface text-white text-xs font-bold transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-surface outline-none"
                                 >
                                     Sign In
                                 </Link>
@@ -186,32 +189,26 @@ export function Navbar() {
             </header>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-surface/90 backdrop-blur-xl border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
+            <nav aria-label="Main navigation" className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-surface/90 backdrop-blur-xl border-t border-white/5 pb-[env(safe-area-inset-bottom)]">
                 <div className="flex items-center justify-around h-16">
                     {navLinks.map((link) => {
-                        const isActive = pathname === link.href || (link.href !== "/" && pathname?.startsWith(link.href));
+                        const isActive = isLinkActive(link.href);
                         return (
-                            <Link
-                                key={link.name}
-                                href={link.href}
-                                aria-current={isActive ? "page" : undefined}
-                                className={clsx(
-                                    "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors",
-                                    isActive ? "text-accent-primary" : "text-text-secondary hover:text-white"
+                            <Fragment key={link.name}>
+                                {link.name === "Library" && (
+                                    <button type="button" onClick={() => setShowSearch(true)} className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-secondary hover:text-white">
+                                        <Search size={20} />
+                                        <span className="text-xs font-medium">Search</span>
+                                    </button>
                                 )}
-                            >
-                                <link.icon size={20} className={isActive ? "fill-accent-primary/20" : ""} />
-                                <span className="text-[10px] font-medium">{link.name}</span>
-                            </Link>
+                                <Link href={link.href} aria-current={isActive ? "page" : undefined}
+                                    className={clsx("flex h-full w-full flex-col items-center justify-center gap-1 transition-colors", isActive ? "text-accent-primary" : "text-text-secondary hover:text-white")}>
+                                    <link.icon size={20} className={isActive ? "fill-accent-primary/20" : ""} />
+                                    <span className="text-xs font-medium">{link.name}</span>
+                                </Link>
+                            </Fragment>
                         );
                     })}
-                    <button
-                        onClick={() => setShowSearch(true)}
-                        className="flex flex-col items-center justify-center w-full h-full space-y-1 text-text-secondary hover:text-white transition-colors"
-                    >
-                        <Search size={20} />
-                        <span className="text-[10px] font-medium">Search</span>
-                    </button>
                     <SignedIn>
                         <Link
                             href="/profile"
@@ -221,9 +218,10 @@ export function Navbar() {
                             )}
                         >
                             <User size={20} />
-                            <span className="text-[10px] font-medium">Profile</span>
+                            <span className="text-xs font-medium">Profile</span>
                         </Link>
                     </SignedIn>
+                    <SignedOut><Link href="/sign-in" className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-secondary"><User size={20} /><span className="text-xs font-medium">Sign in</span></Link></SignedOut>
                 </div>
             </nav>
 
@@ -231,6 +229,7 @@ export function Navbar() {
             <AnimatePresence>
                 {showSearch && (
                     <motion.dialog
+                        onKeyDown={trapDialogFocus}
                         ref={dialogRef}
                         aria-label="Search movies and TV shows"
                         onCancel={() => setShowSearch(false)}
@@ -239,7 +238,7 @@ export function Navbar() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="m-0 max-w-none max-h-none w-screen h-dvh fixed inset-0 z-[100] bg-bg-main/80 backdrop-blur-2xl flex flex-col pt-[20vh] items-center px-4"
+                        className="m-0 overflow-y-auto max-w-none max-h-none w-screen h-dvh fixed inset-0 z-[100] bg-bg-main/80 backdrop-blur-2xl flex flex-col pt-[12vh] sm:pt-[16vh] items-center px-4"
                     >
                         <div ref={wrapperRef} className="w-full max-w-2xl relative">
                             <form onSubmit={handleSearchCheck} className="relative w-full">
@@ -263,18 +262,24 @@ export function Navbar() {
                                 </button>
                             </form>
 
+                            <div role="status" aria-live="polite" className="mt-3 text-sm text-text-secondary">
+                                {suggestionStatus === "loading" && "Searching…"}
+                                {suggestionStatus === "error" && <p>Search is unavailable. <button type="button" onClick={() => setSearchRetry(value => value + 1)} className="underline text-accent-primary">Retry</button></p>}
+                                {suggestionStatus === "ready" && (suggestions.length === 0 ? "No matching titles or people. Try another search." : `${suggestions.length} suggestions available.`)}
+                            </div>
+                            {searchQuery.trim().length > 0 && <Link href={`/search?q=${encodeURIComponent(searchQuery.trim())}`} onClick={() => setShowSearch(false)} className="mt-2 inline-flex min-h-11 items-center text-sm text-accent-primary">View all search results →</Link>}
                             {/* Results */}
                             {suggestions.length > 0 && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className="absolute top-full left-0 right-0 mt-4 bg-bg-surface/50 border border-white/5 rounded-3xl overflow-hidden shadow-2xl"
+                                    className="mt-4 max-h-[55dvh] overflow-y-auto bg-bg-surface/95 border border-white/5 rounded-3xl shadow-2xl"
                                 >
                                     {suggestions.map((item: any) => {
                                         const isTV = item.media_type === "tv";
-                                        const title = isTV ? item.name : item.title;
+                                        const title = item.title || item.name;
                                         const date = isTV ? item.first_air_date : item.release_date;
-                                        const href = isTV ? `/tv/${item.id}` : `/movie/${item.id}`;
+                                        const href = item.media_type === "person" ? `/person/${item.id}` : isTV ? `/tv/${item.id}` : `/movie/${item.id}`;
                                         return (
                                             <Link
                                                 key={`${item.media_type}-${item.id}`}
@@ -283,9 +288,9 @@ export function Navbar() {
                                                 className="flex items-center gap-4 p-4 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 group outline-none focus-visible:bg-white/10"
                                             >
                                                 <div className="w-12 h-16 relative bg-bg-elevated rounded overflow-hidden shrink-0">
-                                                    {item.poster_path ? (
+                                                    {(item.poster_path || item.profile_path) ? (
                                                         <Image
-                                                            src={`https://image.tmdb.org/t/p/w92${item.poster_path}`}
+                                                            src={`https://image.tmdb.org/t/p/w92${item.poster_path || item.profile_path}`}
                                                             alt={title || ""}
                                                             fill
                                                             sizes="48px"

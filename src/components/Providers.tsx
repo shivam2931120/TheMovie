@@ -13,6 +13,7 @@ import { DiaryProvider } from "@/context/DiaryContext";
 import { RecommendationPreferencesProvider } from "@/context/RecommendationPreferencesContext";
 
 import { ProfilePreferencesProvider } from "@/context/ProfilePreferencesContext";
+import { ActionNoticeProvider } from "./ActionNotice";
 import { FeedbackProvider } from "@/context/FeedbackContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -27,7 +28,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                             <ReviewProvider>
                                 <ListsProvider>
                                     <SocialProvider>
-                                        {children}
+                                        <ActionNoticeProvider>{children}</ActionNoticeProvider>
                                     </SocialProvider>
                                 </ListsProvider>
                             </ReviewProvider>

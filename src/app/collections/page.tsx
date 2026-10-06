@@ -51,7 +51,7 @@ export default function CollectionsPage() {
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <List className="text-accent-primary" size={24} /> Your Lists
                     </h2>
-                    <Link href="/lists" className="flex items-center gap-2 px-4 py-2 bg-accent-primary rounded-lg text-sm font-bold text-white hover:bg-accent-primary/90 transition-colors">
+                    <Link href="/lists" className="flex items-center gap-2 px-4 py-2 bg-accent-surface rounded-lg text-sm font-bold text-white hover:bg-accent-surface/90 transition-colors">
                         <Plus size={16} /> Create List
                     </Link>
                 </div>

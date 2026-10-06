@@ -115,7 +115,7 @@ export function ServiceWorkerRegistration() {
                                     reloadAfterUpdate.current = true;
                                     waitingWorker.postMessage({ type: "SKIP_WAITING" });
                                 }}
-                                className="px-4 py-1.5 bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold rounded-lg transition-all"
+                                className="px-4 py-1.5 bg-accent-surface hover:bg-accent-surface/90 text-white text-xs font-bold rounded-lg transition-all"
                             >
                                 Refresh
                             </button>

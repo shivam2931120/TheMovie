@@ -168,7 +168,7 @@ export function CustomSignIn() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-accent-primary hover:bg-accent-primary/90 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-accent-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="w-full bg-accent-surface hover:bg-accent-surface/90 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-accent-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>

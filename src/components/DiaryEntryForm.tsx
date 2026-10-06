@@ -35,7 +35,7 @@ function DiaryForm({ item, entry, onSaved }: { item: any; entry?: DiaryEntry; on
                 <label className="text-sm text-white">Rating<select className={field} value={rating} onChange={(event) => setRating(Number(event.target.value))}><option value={0}>No rating</option>{Array.from({ length: 10 }, (_, index) => <option key={index} value={index + 1}>{index + 1}/10</option>)}</select></label>
             </div>
             <label className="block text-sm text-white">Private notes<textarea className={field} value={notes} maxLength={1000} rows={3} placeholder="What did you think?" onChange={(event) => setNotes(event.target.value)} /></label>
-            <div className="flex items-center gap-4"><button disabled={loading} className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{entry ? "Update entry" : "Log this watch"}</button><Link href="/diary" className="text-sm text-accent-primary">Open diary</Link></div>
+            <div className="flex items-center gap-4"><button disabled={loading} className="rounded-lg bg-accent-surface px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{entry ? "Update entry" : "Log this watch"}</button><Link href="/diary" className="text-sm text-accent-primary">Open diary</Link></div>
             <p className="text-xs text-text-muted" role="status">{message || status}</p>
         </form>
     );

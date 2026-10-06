@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, useMotionValue, useTransform, useReducedMotion, PanInfo } from "framer-motion";
-import { PlayCircle, Plus, Check, Eye, EyeOff, Star, Info } from "lucide-react";
+import { PlayCircle, Plus, Check, Eye, EyeOff, Star, Info, MoreHorizontal } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useContext, useEffect, useRef } from "react";
+import { useActionNotice } from "./ActionNotice";
 import clsx from "clsx";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
@@ -47,7 +48,8 @@ export function MovieCard({ movie, className, priority = false, recommendation =
     const cardRef = useRef<HTMLDivElement>(null);
     const reducedMotion = useReducedMotion();
     const { openSignIn } = useClerk();
-    const { dismiss } = useRecommendationPreferences();
+    const notify = useActionNotice();
+    const { dismiss, restore } = useRecommendationPreferences();
 
     const [isHovered, setIsHovered] = useState(false);
     const [swipeAction, setSwipeAction] = useState<'watchlist' | 'watched' | null>(null);
@@ -58,8 +60,8 @@ export function MovieCard({ movie, className, priority = false, recommendation =
         ["rgba(34, 197, 94, 0.3)", "rgba(0, 0, 0, 0)", "rgba(255, 49, 88, 0.3)"]
     );
 
-    const { has, add, remove } = useContext(WatchlistContext) as any;
-    const { hasWatched, addWatched, removeWatched } = useContext(WatchedContext) as any;
+    const { has, add, remove, items } = useContext(WatchlistContext) as any;
+    const { hasWatched, addWatched, removeWatched, watched } = useContext(WatchedContext) as any;
     const { getRatingForItem, upsertRating, deleteRatingForItem } = useRatings() as any;
 
     const type = movie.type || (movie.name ? 'tv' : 'movie');
@@ -112,31 +114,32 @@ export function MovieCard({ movie, className, priority = false, recommendation =
         return ()=>{clearTimeout(timer);observer.disconnect();document.removeEventListener('visibilitychange',schedule);};
     },[recommendation,enabled,owner,movie.id,movie.recommendationModel,movie.recommendationRequestId,type,source,record]);
 
+    const toggleWatchlist = () => {
+        const previous = items.find((item: any) => item.id === movie.id && (item.type || 'movie') === type) || { ...movie, type };
+        if (isWatchlisted) remove(movie.id, type); else add({ ...movie, type });
+        notify(isWatchlisted ? `${title} removed from watchlist` : `${title} added to watchlist`, () => isWatchlisted ? add(previous) : remove(movie.id, type));
+    };
+    const toggleWatched = () => {
+        const previous = watched.find((item: any) => item.id === movie.id && (item.type || 'movie') === type) || { ...movie, type };
+        if (isWatched) removeWatched(movie.id, type); else addWatched({ ...movie, type });
+        notify(isWatched ? `${title} marked unwatched` : `${title} marked watched`, () => isWatched ? addWatched(previous) : removeWatched(movie.id, type));
+    };
     const handleDragEnd = (_event: any, info: PanInfo) => {
         const offset = info.offset.x;
         const velocity = info.velocity.x;
-
-        if (!isSignedIn && (Math.abs(offset) > 50 || Math.abs(velocity) > 500)) {
-            openSignIn();
-            x.set(0);
-            return;
-        }
-
-        if (offset > 50 || velocity > 500) {
-            if (!isWatchlisted) {
-                add({ ...movie, type });
-                setSwipeAction('watchlist');
-                setTimeout(() => setSwipeAction(null), 2000);
-            }
-        } else if (offset < -50 || velocity < -500) {
-            if (!isWatched) {
-                addWatched({ ...movie, type });
-                setSwipeAction('watched');
-                setTimeout(() => setSwipeAction(null), 2000);
-            }
+        if (!isSignedIn && (Math.abs(offset) > 50 || Math.abs(velocity) > 500)) { openSignIn(); x.set(0); return; }
+        if ((offset > 50 || velocity > 500) && !isWatchlisted) {
+            toggleWatchlist(); setSwipeAction('watchlist');
+        } else if ((offset < -50 || velocity < -500) && !isWatched) {
+            toggleWatched(); setSwipeAction('watched');
         }
         x.set(0);
     };
+    useEffect(() => {
+        if (!swipeAction) return;
+        const timeout = setTimeout(() => setSwipeAction(null), 2000);
+        return () => clearTimeout(timeout);
+    }, [swipeAction]);
 
     return (
         <motion.div
@@ -194,6 +197,10 @@ export function MovieCard({ movie, className, priority = false, recommendation =
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90 transition-opacity duration-500 group-hover:opacity-100" />
                 <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] pointer-events-none" />
 
+                {(isWatchlisted || isWatched) && <div className="pointer-events-none absolute left-2 top-2 z-20 flex flex-col gap-1 text-[11px] font-medium">
+                    {isWatchlisted && <span className="rounded-full bg-black/80 px-2 py-1 text-white">Saved</span>}
+                    {isWatched && <span className="rounded-full bg-black/80 px-2 py-1 text-green-300">Watched</span>}
+                </div>}
                 <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} onClick={() => { if (recommendation) record({id:movie.id,type,kind:"click",source,model:movie.recommendationModel,requestId:movie.recommendationRequestId}); }} aria-label={`View ${title || "title"}`} className="absolute inset-0 z-10 outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-inset" />
 
                 {/* Hover UI */}
@@ -202,7 +209,7 @@ export function MovieCard({ movie, className, priority = false, recommendation =
                 </div>
 
                 {/* Default Visible Metadata */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none transform transition-transform duration-500 group-hover:-translate-y-12 group-focus-within:-translate-y-12 max-sm:-translate-y-12">
+                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none transform transition-transform duration-500 group-hover:-translate-y-12 group-focus-within:-translate-y-12 card-caption">
                     {rating !== null && rating > 0 && (
                         <div className="flex items-center gap-1.5 mb-1.5">
                             <Star size={12} className="text-accent-primary fill-accent-primary" />
@@ -216,24 +223,26 @@ export function MovieCard({ movie, className, priority = false, recommendation =
                 </div>
 
                 {/* Hover Reveal Actions */}
-                <div className="absolute bottom-0 left-0 right-0 p-1 sm:p-4 z-30 translate-y-full group-hover:translate-y-0 group-focus-within:translate-y-0 max-sm:translate-y-0 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-between pointer-events-auto bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
+                <div className="absolute bottom-0 left-0 right-0 p-1 sm:p-4 z-30 translate-y-full group-hover:translate-y-0 group-focus-within:translate-y-0 card-actions transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] flex items-center justify-between pointer-events-auto bg-gradient-to-t from-black via-black/90 to-transparent pt-12">
                     <div className="flex gap-0.5 sm:gap-2">
                         <button
-                            onClick={(e) => handleAction(e, () => isWatchlisted ? remove(movie.id, type) : add({ ...movie, type }))}
+                            onClick={(e) => handleAction(e, toggleWatchlist)}
                             className={clsx(
                                 "p-3 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
-                                isWatchlisted ? "bg-accent-primary border-accent-primary text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                                isWatchlisted ? "bg-accent-surface border-accent-primary text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
+                            aria-pressed={isWatchlisted}
                             aria-label={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
                         >
                             {isWatchlisted ? <Check size={16} /> : <Plus size={16} />}
                         </button>
                         <button
-                            onClick={(e) => handleAction(e, () => isWatched ? removeWatched(movie.id, type) : addWatched({ ...movie, type }))}
+                            onClick={(e) => handleAction(e, toggleWatched)}
                             className={clsx(
                                 "p-3 rounded-full backdrop-blur-md border transition-all focus-visible:ring-2 focus-visible:ring-accent-primary outline-none",
                                 isWatched ? "bg-green-600 border-green-600 text-white" : "bg-white/10 border-white/20 text-white hover:bg-white/20"
                             )}
+                            aria-pressed={isWatched}
                             aria-label={isWatched ? "Mark unwatched" : "Mark watched"}
                         >
                             {isWatched ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -248,10 +257,18 @@ export function MovieCard({ movie, className, priority = false, recommendation =
                         <Info size={16} />
                     </Link>
                 </div>
+                <details className="card-touch-menu absolute inset-x-2 bottom-2 z-40" onPointerDown={event => event.stopPropagation()}>
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-full border border-white/20 bg-black/80 text-xs font-medium text-white"><MoreHorizontal size={18} />Actions</summary>
+                    <div className="absolute inset-x-0 bottom-full mb-2 rounded-xl border border-white/20 bg-bg-surface p-1 shadow-xl">
+                        <button type="button" aria-pressed={isWatchlisted} className="min-h-11 w-full rounded-lg px-2 text-left text-xs text-white hover:bg-white/10" onClick={event => { handleAction(event, toggleWatchlist); event.currentTarget.closest('details')?.removeAttribute('open'); }}>{isWatchlisted ? 'Remove saved title' : 'Add to watchlist'}</button>
+                        <button type="button" aria-pressed={isWatched} className="min-h-11 w-full rounded-lg px-2 text-left text-xs text-white hover:bg-white/10" onClick={event => { handleAction(event, toggleWatched); event.currentTarget.closest('details')?.removeAttribute('open'); }}>{isWatched ? 'Mark unwatched' : 'Mark watched'}</button>
+                        <Link href={`/${type === 'tv' ? 'tv' : 'movie'}/${movie.id}`} className="flex min-h-11 items-center rounded-lg px-2 text-xs text-accent-primary" onClick={() => { if (recommendation) record({ id: movie.id, type, kind: 'click', source, model: movie.recommendationModel, requestId: movie.recommendationRequestId }); }}>View details</Link>
+                    </div>
+                </details>
             </div>
             {recommendation && <div className="space-y-2 border-t border-white/10 bg-bg-card p-3 text-xs" onPointerDown={(event) => event.stopPropagation()}>
                 <details className="text-text-secondary"><summary className="cursor-pointer text-accent-primary">Why this title?</summary><p className="mt-2">{reason || "Similar to titles you enjoy"}</p></details>
-                <button type="button" onClick={(event) => { event.stopPropagation(); dismiss({ ...movie, type }); }} className="text-text-muted hover:text-white" aria-label={`Not interested in ${title}`}>Not interested</button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); dismiss({ ...movie, type }); notify(`${title} hidden from recommendations`, () => restore(movie.id, type)); }} className="text-text-muted hover:text-white" aria-label={`Not interested in ${title}`}>Not interested</button>
             </div>}
         </motion.div>
     );

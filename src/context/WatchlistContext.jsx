@@ -60,6 +60,7 @@ export function WatchlistProvider({ children }) {
 
   const value = useMemo(() => ({
     items,
+    loading,
     movies,
     tvShows,
     add,
@@ -67,6 +68,6 @@ export function WatchlistProvider({ children }) {
     toggle,
     has,
     count: items.length
-  }), [items, movies, tvShows, add, remove, toggle, has]);
+  }), [items, loading, movies, tvShows, add, remove, toggle, has]);
   return <WatchlistContext.Provider value={value}>{children}</WatchlistContext.Provider>;
 }

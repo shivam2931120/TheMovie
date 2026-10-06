@@ -7,39 +7,23 @@ import { getTrendingMovies } from "@/api/tmdb";
 import { MovieCardSkeleton } from "./Skeletons";
 import Link from "next/link";
 
-const MOCK_MOVIES = [
-    { id: 1, title: "Oppenheimer", poster_path: "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg", vote_average: 8.1, release_date: "2023-07-19" },
-    { id: 2, title: "Barbie", poster_path: "/iuFNMS8U5cb6xfzi51QaJfjBFbj.jpg", vote_average: 7.2, release_date: "2023-07-19" },
-    { id: 3, title: "Avatar: The Way of Water", poster_path: "/t6HIqrRAclMCA60NsSmeqe9RmNV.jpg", vote_average: 7.7, release_date: "2022-12-14" },
-    { id: 4, title: "Guardians of the Galaxy Vol. 3", poster_path: "/r2J02Z2OpNTctfOSN1Ydgii51I3.jpg", vote_average: 8.0, release_date: "2023-05-03" },
-    { id: 5, title: "Spider-Man: Across the Spider-Verse", poster_path: "/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg", vote_average: 8.4, release_date: "2023-05-31" },
-];
-
 export function TrendingSection() {
     const [movies, setMovies] = useState<any[]>([]);
+    const [error, setError] = useState(false);
+    const [attempt, setAttempt] = useState(0);
     const [loading, setLoading] = useState(true);
     const rowRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
 
     useEffect(() => {
-        async function loadTrending() {
-            try {
-                const data = await getTrendingMovies("week");
-                if (data?.results && data.results.length > 0) {
-                    setMovies(data.results.slice(0, 10)); // Top 10
-                } else {
-                    setMovies(MOCK_MOVIES);
-                }
-            } catch (e) {
-                console.error("Failed to load trending movies", e);
-                setMovies(MOCK_MOVIES);
-            } finally {
-                setLoading(false);
-            }
-        }
-        loadTrending();
-    }, []);
+        const controller = new AbortController();
+        setLoading(true); setError(false);
+        getTrendingMovies("week", { signal: controller.signal, throwOnError: true }).then(data => {
+            if (!controller.signal.aborted) setMovies((data?.results || []).slice(0, 10));
+        }).catch(() => { if (!controller.signal.aborted) setError(true); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [attempt]);
 
     const checkScrollability = () => {
         if (rowRef.current) {
@@ -57,8 +41,9 @@ export function TrendingSection() {
         }
     };
 
+    if (!loading && (error || !movies.length)) return <section className="container mx-auto px-6 py-8 lg:px-20"><h2 className="text-2xl font-display font-bold text-white">Trending Now</h2><p role="status" className="mt-2 text-text-secondary">{error ? 'Trending titles could not load.' : 'No trending titles are available right now.'}</p><button type="button" className="mt-3 min-h-11 text-accent-primary underline" onClick={() => setAttempt(value => value + 1)}>Retry trending</button></section>;
     return (
-        <section className="relative py-16 sm:py-24 group/row overflow-hidden bg-gradient-to-b from-transparent via-bg-surface/30 to-transparent border-y border-white/5">
+        <section className="relative py-8 sm:py-12 group/row overflow-hidden bg-gradient-to-b from-transparent via-bg-surface/30 to-transparent border-y border-white/5">
             <div className="container px-6 lg:px-20 mx-auto">
                 <div className="flex items-end justify-between mb-12 relative z-20">
                     <div>
@@ -71,11 +56,11 @@ export function TrendingSection() {
                         </Link>
                         
                         {/* Desktop Controls */}
-                        <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity duration-300">
-                            <button onClick={() => scroll("left")} disabled={!canScrollLeft} className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        <div className="hidden sm:flex items-center gap-2 opacity-80 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity duration-300">
+                            <button aria-label="Scroll trending titles left" onClick={() => scroll("left")} disabled={!canScrollLeft} className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                                 <ChevronLeft size={20} />
                             </button>
-                            <button onClick={() => scroll("right")} disabled={!canScrollRight} className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                            <button aria-label="Scroll trending titles right" onClick={() => scroll("right")} disabled={!canScrollRight} className="p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                                 <ChevronRight size={20} />
                             </button>
                         </div>

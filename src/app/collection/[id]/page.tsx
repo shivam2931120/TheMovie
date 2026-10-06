@@ -60,7 +60,7 @@ export default function CollectionPage() {
                     <div className="mt-8 rounded-xl border border-white/10 bg-white/5 p-8 text-center">
                         <h1 className="text-2xl font-bold text-white">Collection unavailable</h1>
                         <p className="mt-2 text-text-secondary">{error || "This collection could not be found."}</p>
-                        <button onClick={() => window.location.reload()} className="mt-5 rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white">Retry</button>
+                        <button onClick={() => window.location.reload()} className="mt-5 rounded-lg bg-accent-surface px-4 py-2 text-sm font-bold text-white">Retry</button>
                     </div>
                 )}
             </div>

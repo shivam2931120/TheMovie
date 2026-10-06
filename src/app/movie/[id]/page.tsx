@@ -10,7 +10,7 @@ import { MovieCard } from "@/components/MovieCard";
 import { UserRatingPanel } from "@/components/UserRatingPanel";
 import { WatchProviders } from "@/components/WatchProviders";
 import { DiaryEntryForm } from "@/components/DiaryEntryForm";
-import YouTube from "react-youtube";
+import { TrailerDialog } from "@/components/TrailerDialog";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
 import clsx from "clsx";
@@ -175,37 +175,14 @@ export default function MovieDetailsPage() {
             </div>
 
             {/* Trailer Modal */}
-            <AnimatePresence>
-                {showTrailer && activeVideo && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4"
-                        onClick={() => { setShowTrailer(false); setSelectedVideo(null); }}
-                    >
-                        <button className="absolute top-8 right-8 text-white hover:text-accent-primary p-2 z-50">
-                            <X size={32} />
-                        </button>
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="w-full max-w-6xl aspect-video relative rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            <YouTube
-                                videoId={activeVideo.key}
-                                opts={{ width: '100%', height: '100%', playerVars: { autoplay: 1 } }}
-                                className="w-full h-full"
-                            />
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {showTrailer && activeVideo && <TrailerDialog videoKey={activeVideo.key} title={movie.title} onClose={() => { setShowTrailer(false); setSelectedVideo(null); }} />}
 
             {/* Cinematic Hero Section */}
             <div className="relative w-full h-[75vh] min-h-[600px] z-10 flex items-end pb-12">
                 <div className="absolute inset-0">
                     {movie.backdrop_path || fmdbPoster ? (
                         <Image
-                            src={movie.backdrop_path ? `https://image.tmdb.org/t/p/original${movie.backdrop_path}` : fmdbPoster as string}
+                            src={movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : fmdbPoster as string}
                             alt={movie.title}
                             fill
                             priority
@@ -267,7 +244,7 @@ export default function MovieDetailsPage() {
                                     onClick={handleWatchlist}
                                     className={clsx(
                                         "flex items-center justify-center p-4 rounded-full transition-all border backdrop-blur-md hover:scale-105",
-                                        isWatchlisted ? "bg-accent-primary border-accent-primary text-white shadow-cinematic-glow" : "bg-glass border-border text-white hover:bg-white/10"
+                                        isWatchlisted ? "bg-accent-surface border-accent-primary text-white shadow-cinematic-glow" : "bg-glass border-border text-white hover:bg-white/10"
                                     )}
                                 >
                                     {isWatchlisted ? <Check size={20} /> : <Plus size={20} />}
@@ -495,7 +472,7 @@ export default function MovieDetailsPage() {
                     <div className="mt-24">
                         <div className="relative rounded-[2rem] overflow-hidden shadow-elevated border border-white/5 bg-bg-surface">
                             {collection.backdrop_path && (
-                                <Image src={`https://image.tmdb.org/t/p/original${collection.backdrop_path}`} alt={collection.name} fill className="object-cover opacity-30" />
+                                <Image src={`https://image.tmdb.org/t/p/w1280${collection.backdrop_path}`} alt={collection.name} fill className="object-cover opacity-30" />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-bg-main via-bg-main/80 to-transparent" />
                             <div className="relative z-10 p-8 sm:p-12">

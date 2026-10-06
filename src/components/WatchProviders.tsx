@@ -46,6 +46,7 @@ export function WatchProviders({ providers, availableRegions, selectedRegion, on
                 <div className="flex items-center gap-2">
                     <MapPin size={16} className="text-text-muted" />
                     <select
+                        aria-label="Streaming availability region"
                         value={selectedRegion}
                         onChange={(event) => onRegionChange(event.target.value)}
                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-accent-primary focus:outline-none"
@@ -72,7 +73,7 @@ export function WatchProviders({ providers, availableRegions, selectedRegion, on
                                     {items.map((provider) => (
                                         <div key={`${key}-${provider.provider_id}`} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
                                             <Image
-                                                src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
+                                                src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
                                                 alt={provider.provider_name}
                                                 width={32}
                                                 height={32}

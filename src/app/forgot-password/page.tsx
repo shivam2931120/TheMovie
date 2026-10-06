@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-accent-primary hover:bg-accent-primary/90 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full bg-accent-surface hover:bg-accent-surface/90 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {loading && <Loader2 size={18} className="animate-spin" />}
                                 Send Reset Code
@@ -146,7 +146,7 @@ export default function ForgotPasswordPage() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-accent-primary hover:bg-accent-primary/90 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                className="w-full bg-accent-surface hover:bg-accent-surface/90 text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {loading && <Loader2 size={18} className="animate-spin" />}
                                 Reset Password

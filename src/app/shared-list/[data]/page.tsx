@@ -56,7 +56,7 @@ export default function SharedListPage() {
                         <ListChecks className="mx-auto mb-4 text-accent-primary" size={36} />
                         <h1 className="text-2xl font-bold text-white mb-2">Shared List Unavailable</h1>
                         <p className="text-text-secondary mb-6">This list is private, was removed, or its link is invalid.</p>
-                        <Link href="/lists" className="inline-flex rounded-lg bg-accent-primary px-4 py-2 text-sm font-bold text-white">
+                        <Link href="/lists" className="inline-flex rounded-lg bg-accent-surface px-4 py-2 text-sm font-bold text-white">
                             Go to Lists
                         </Link>
                     </div>

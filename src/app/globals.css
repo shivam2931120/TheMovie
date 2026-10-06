@@ -7,11 +7,12 @@
     --bg-elevated: #111118;
 
     --accent-primary: #FF3158;
+    --accent-surface: #C51940;
     --accent-secondary: #8B5CF6;
 
     --text-primary: #FFFFFF;
     --text-secondary: #A1A1AA;
-    --text-muted: #71717A;
+    --text-muted: #9999A3;
 
     --font-inter: 'Inter', sans-serif;
     --font-dm-sans: 'DM Sans', sans-serif;
@@ -25,6 +26,7 @@
     --color-bg-elevated: var(--bg-elevated);
 
     --color-accent-primary: var(--accent-primary);
+    --color-accent-surface: var(--accent-surface);
     --color-accent-secondary: var(--accent-secondary);
 
     --color-text-primary: var(--text-primary);
@@ -158,4 +160,16 @@ dialog::backdrop { background: rgba(0,0,0,.6); }
 @media (max-width: 639px) {
   .container { padding-left: 1rem; padding-right: 1rem; }
   input:not([type="checkbox"]):not([type="range"]), select, textarea { font-size: 16px; }
+}
+
+.card-touch-menu { display: none; }
+
+/* Touch devices expose the same card controls as hover and keyboard users. */
+@media (hover: none), (pointer: coarse) {
+    .card-actions { display: none; }
+    .card-touch-menu { display: block; }
+    .card-caption { transform: translateY(-3rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .card-actions, .card-caption { transition: none; }
 }

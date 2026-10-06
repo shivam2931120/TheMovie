@@ -1,5 +1,7 @@
 "use client";
 
+import { LibraryNav } from "@/components/LibraryNav";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getMovieDetails, getTVDetails, searchMulti } from "@/api/tmdb";
@@ -54,6 +56,7 @@ function DiaryContent() {
     return (
         <main className="min-h-screen bg-bg-main pt-32 pb-20">
             <div className="container mx-auto space-y-8 px-4 sm:px-6 lg:px-20">
+                <LibraryNav active="diary" />
                 <header><h1 className="text-3xl font-display font-bold text-white">Watch Diary</h1><p className="mt-2 text-text-secondary">Log each viewing, remember your thoughts, and keep track of rewatches. Your notes are private.</p><p role="status" className="mt-2 text-xs text-text-muted">{status}</p></header>
                 <section className="rounded-xl border border-white/10 bg-bg-card p-5">
                     <h2 className="mb-3 text-lg font-bold text-white">Log a watch</h2>

@@ -17,7 +17,7 @@ export default function OfflinePage() {
                 </p>
                 <button
                     onClick={() => window.location.reload()}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent-primary hover:bg-accent-primary/90 text-white font-bold rounded-lg transition-all"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-accent-surface hover:bg-accent-surface/90 text-white font-bold rounded-lg transition-all"
                 >
                     <RefreshCw size={18} />
                     Try Again

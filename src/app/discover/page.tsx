@@ -224,16 +224,16 @@ function DiscoverContent() {
                 </div>
 
                 <div className="flex flex-wrap gap-4 mb-10 items-center">
-                    <button onClick={() => handlePreset('era')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'era' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                    <button onClick={() => handlePreset('era')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'era' ? "bg-accent-surface border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
                         <Calendar size={18} /> 80s & 90s Classics
                     </button>
-                    <button onClick={() => handlePreset('awards')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'awards' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                    <button onClick={() => handlePreset('awards')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'awards' ? "bg-accent-surface border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
                         <Trophy size={18} /> Top Rated
                     </button>
-                    <button onClick={() => handlePreset('recent')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'recent' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                    <button onClick={() => handlePreset('recent')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'recent' ? "bg-accent-surface border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
                         <TrendingUp size={18} /> This Year
                     </button>
-                    <button onClick={() => handlePreset('hidden')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'hidden' ? "bg-accent-primary border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
+                    <button onClick={() => handlePreset('hidden')} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", activePreset === 'hidden' ? "bg-accent-surface border-accent-primary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
                         <Star size={18} /> Hidden Gems
                     </button>
                     <button onClick={() => setShowRandomPicker(!showRandomPicker)} className={clsx("flex items-center gap-2 px-6 py-3 rounded-full border transition-all shadow-glass font-medium text-sm", showRandomPicker ? "bg-accent-secondary border-accent-secondary text-white" : "bg-white/5 border-white/10 text-white hover:bg-white/10")}>
@@ -272,7 +272,7 @@ function DiscoverContent() {
                         </label>
 
                         <div className="flex gap-3">
-                            <button onClick={applyProviderFilter} className="rounded-xl bg-accent-primary px-6 py-3 text-sm font-bold text-white transition-all hover:scale-105 shadow-cinematic-glow">Apply</button>
+                            <button onClick={applyProviderFilter} className="rounded-xl bg-accent-surface px-6 py-3 text-sm font-bold text-white transition-all hover:scale-105 shadow-cinematic-glow">Apply</button>
                             {activeWatchProvider && (
                                 <button onClick={clearProviderFilter} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-all hover:bg-white/10" aria-label="Clear"><X size={18} /></button>
                             )}
@@ -353,7 +353,7 @@ function DiscoverContent() {
                                     )}
 
                                     {currentPage > 1 && <button onClick={() => handlePageChange(currentPage - 1)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">{currentPage - 1}</button>}
-                                    <button className="px-5 py-2 rounded-full bg-accent-primary border border-accent-primary text-white font-bold">{currentPage}</button>
+                                    <button className="px-5 py-2 rounded-full bg-accent-surface border border-accent-primary text-white font-bold">{currentPage}</button>
                                     {currentPage < totalPages && <button onClick={() => handlePageChange(currentPage + 1)} className="px-5 py-2 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-medium">{currentPage + 1}</button>}
 
                                     {currentPage < totalPages - 1 && (

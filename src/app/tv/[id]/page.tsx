@@ -11,7 +11,7 @@ import { UserRatingPanel } from "@/components/UserRatingPanel";
 import { EpisodeTracker } from "@/components/EpisodeTracker";
 import { WatchProviders } from "@/components/WatchProviders";
 import { DiaryEntryForm } from "@/components/DiaryEntryForm";
-import YouTube from "react-youtube";
+import { TrailerDialog } from "@/components/TrailerDialog";
 import { WatchlistContext } from "@/context/watchlist-context";
 import { RecentlyViewedContext } from "@/context/RecentlyViewedContext";
 import clsx from "clsx";
@@ -137,35 +137,12 @@ export default function TVDetailsPage() {
                 <div className="absolute inset-0 bg-bg-main/80" />
             </div>
 
-            <AnimatePresence>
-                {showTrailer && activeVideo && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4"
-                        onClick={() => { setShowTrailer(false); setSelectedVideo(null); }}
-                    >
-                        <button className="absolute top-8 right-8 text-white hover:text-accent-primary p-2 z-50">
-                            <X size={32} />
-                        </button>
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-                            className="w-full max-w-6xl aspect-video relative rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]"
-                            onClick={e => e.stopPropagation()}
-                        >
-                            <YouTube
-                                videoId={activeVideo.key}
-                                opts={{ width: '100%', height: '100%', playerVars: { autoplay: 1 } }}
-                                className="w-full h-full"
-                            />
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {showTrailer && activeVideo && <TrailerDialog videoKey={activeVideo.key} title={tv.name} onClose={() => { setShowTrailer(false); setSelectedVideo(null); }} />}
 
             <div className="relative w-full h-[75vh] min-h-[600px] z-10 flex items-end pb-12">
                 <div className="absolute inset-0">
                     {tv.backdrop_path ? (
-                        <Image src={`https://image.tmdb.org/t/p/original${tv.backdrop_path}`} alt={tv.name} fill priority className="object-cover object-top mask-image-b" />
+                        <Image src={`https://image.tmdb.org/t/p/w1280${tv.backdrop_path}`} alt={tv.name} fill priority className="object-cover object-top mask-image-b" />
                     ) : (
                         <div className="absolute inset-0 bg-bg-surface" />
                     )}
@@ -218,7 +195,7 @@ export default function TVDetailsPage() {
                                     onClick={handleWatchlist}
                                     className={clsx(
                                         "flex items-center justify-center p-4 rounded-full transition-all border backdrop-blur-md hover:scale-105",
-                                        isWatchlisted ? "bg-accent-primary border-accent-primary text-white shadow-cinematic-glow" : "bg-glass border-border text-white hover:bg-white/10"
+                                        isWatchlisted ? "bg-accent-surface border-accent-primary text-white shadow-cinematic-glow" : "bg-glass border-border text-white hover:bg-white/10"
                                     )}
                                 >
                                     {isWatchlisted ? <Check size={20} /> : <Plus size={20} />}
@@ -262,7 +239,7 @@ export default function TVDetailsPage() {
                                                     placeholder="Create new list"
                                                     className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white focus:border-accent-primary focus:outline-none"
                                                 />
-                                                <button type="submit" disabled={!newListName.trim()} aria-label="Create list" className="rounded-lg bg-accent-primary px-3 text-white disabled:opacity-50"><Plus size={18} /></button>
+                                                <button type="submit" disabled={!newListName.trim()} aria-label="Create list" className="rounded-lg bg-accent-surface px-3 text-white disabled:opacity-50"><Plus size={18} /></button>
                                             </form>
                                         </div>
                                     )}
