@@ -19,6 +19,6 @@ try {
     const artifact=JSON.parse(await readFile('src/data/feedback-recommendations.json','utf8'));
     console.log(JSON.stringify({consentedAccounts:consent.rows[0].accounts,feedback:rows,
         deployedFeedbackModel:{version:artifact.version,trainedAt:artifact.trainedAt,movieSeeds:Object.keys(artifact.movie||{}).length,tvSeeds:Object.keys(artifact.tv||{}).length},
-        promotionRequires:{events:200,eligibleUsersPerMediaPerWindow:50,priorPositiveTitlesPerMedia:3,chronologicalWindows:3,beats:['popularity','currently shipped graph']},
+        promotionRequires:{events:200,eligibleUsersPerMediaPerWindow:50,priorPositiveTitlesPerMedia:3,chronologicalWindows:3,minimumNdcgGain:0.005,pairedBootstrapLower95MustBePositive:true,beats:['popularity','currently shipped graph']},
         note:'History counts are a readiness estimate, not the held-out evaluation cohort. Enable learning consent before collecting shared-model feedback.'},null,2));
 } finally {await client.end();}

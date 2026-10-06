@@ -91,7 +91,8 @@ Use `npm run ml:status` first to inspect aggregate consented feedback counts and
 model readiness without exporting account identifiers.
 
 The trainer compares seeded SVD (32/64 dimensions, with/without inverse-frequency
-weighting) and sparse item cosine. Each media type selects its configuration on
+weighting), sparse item cosine and two popularity-adjusted RP3β-style graph
+candidates. Movie and TV matrices are fitted independently. Each media type selects its configuration on
 validation. Repeated behavior is capped per title/kind/day, episode counts are
 bounded, and explicit ratings and dismissals have separate state. Restoring a
 hidden title cancels that dismissal in subsequent exports. Missing interactions and impressions are never
@@ -100,13 +101,16 @@ TMDB IDs coincide. Global chronological training/validation/test windows with
 later-window timestamp ties exclude future events. Promotion requires at least
 50 eligible users per media type in both validation and test, with three prior
 positive titles of that type, and NDCG@20 at least 0.005 higher than both popularity
-and the shipped graph in both windows. Weighted similarities retain their scores
+and the shipped graph in both windows, with a positive lower bound for each
+paired 95% bootstrap NDCG-gain interval. Weighted similarities retain their scores
 and co-user support, require two shared users, and shrink weak support toward zero.
 Reports record input SHA-256, library versions, configuration choices, coverage,
 precision, recall, hit rate, and explicit reasons for blocked promotion. This benchmarks offline
 graphs; it does not prove gains over the full live movie ranker or TMDB TV
 retrieval. Record online metrics and evaluate those separately before an
-accuracy claim. No new feedback model is promoted without real feedback.
+accuracy claim. No new feedback model is promoted without real feedback. Candidate output files
+are immutable and default to timestamped private paths; `--output` cannot write
+inside `src/` or overwrite the input export.
 
 Runtime movie ranking blends the MovieLens, approved feedback, and fresh TMDB
 candidate graphs. Fresh seed metadata and discover candidates include titles

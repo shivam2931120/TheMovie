@@ -1,0 +1,486 @@
+{
+  "implementation_sha256": "c61f5b2209a492b80f4f536d993c7bb4c4d3109b128621852c944c292a7a7c6f",
+  "dataset_sha256": "2c0f34fd943d31ee77ed415f3302c9f707a14e151d5cea922023689a318230ef",
+  "data_quality": {
+    "invalid_events": 0,
+    "duplicate_events": 0
+  },
+  "data_origin": "public_movielens_benchmark",
+  "reference_provenance": "Retrospective shipped-artifact comparator; a strictly historical training cutoff is not established for the shipped graph.",
+  "versions": {
+    "python": "3.12.3",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1",
+    "sklearn": "1.9.1"
+  },
+  "train_events": 70576,
+  "validation_events": 15123,
+  "test_events": 15124,
+  "validation_cutoff": 1376822969.0,
+  "test_cutoff": 1479542666.0,
+  "candidate_configs": [
+    {
+      "name": "svd_32",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": false
+    },
+    {
+      "name": "svd_32_idf",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": true
+    },
+    {
+      "name": "svd_64_idf",
+      "algorithm": "svd",
+      "components": 64,
+      "idf": true
+    },
+    {
+      "name": "item_cosine_idf",
+      "algorithm": "item_cosine",
+      "components": 0,
+      "idf": true
+    },
+    {
+      "name": "rp3beta_06",
+      "algorithm": "rp3beta",
+      "components": 0,
+      "idf": false,
+      "alpha": 1.0,
+      "beta": 0.6
+    },
+    {
+      "name": "rp3beta_03",
+      "algorithm": "rp3beta",
+      "components": 0,
+      "idf": false,
+      "alpha": 1.0,
+      "beta": 0.3
+    }
+  ],
+  "training_scope": "Independent movie and TV matrices",
+  "ranking_weight_contract": "Positive, bounded neighbor scores with co-user support; RP3beta is row-max-scaled before support shrinkage, not a probability.",
+  "long_tail_definition": "Bottom 80% of each training media catalog ordered by distinct positive users; eligible zero-result users stay in metric averages.",
+  "selected_configs": {
+    "movie": {
+      "name": "rp3beta_03",
+      "algorithm": "rp3beta",
+      "components": 0,
+      "idf": false,
+      "alpha": 1.0,
+      "beta": 0.3
+    },
+    "tv": {
+      "name": "svd_32",
+      "algorithm": "svd",
+      "components": 32,
+      "idf": false
+    }
+  },
+  "validation_candidates": {
+    "svd_32": {
+      "movie": {
+        "ndcg_at_20": 0.14814386437188018,
+        "recall_at_20": 0.0453802032200575,
+        "precision_at_20": 0.13928571428571432,
+        "hit_rate": 0.6428571428571429,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 48.83571428571428,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.024151080443072452
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "svd_32_idf": {
+      "movie": {
+        "ndcg_at_20": 0.15207214582923506,
+        "recall_at_20": 0.04745791122633695,
+        "precision_at_20": 0.14285714285714285,
+        "hit_rate": 0.6428571428571429,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 52.29642857142857,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.024332667514072998
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "svd_64_idf": {
+      "movie": {
+        "ndcg_at_20": 0.14352228458947877,
+        "recall_at_20": 0.04210906587344743,
+        "precision_at_20": 0.13214285714285717,
+        "hit_rate": 0.5714285714285714,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 52.760714285714286,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.023787906301071363
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "item_cosine_idf": {
+      "movie": {
+        "ndcg_at_20": 0.16123415831799578,
+        "recall_at_20": 0.0604684098933419,
+        "precision_at_20": 0.12500000000000003,
+        "hit_rate": 0.7857142857142857,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.0035714285714285718,
+        "mean_recommended_training_users": 77.08571428571427,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.020700926094062103
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "rp3beta_06": {
+      "movie": {
+        "ndcg_at_20": 0.1798372148424154,
+        "recall_at_20": 0.061437202350338824,
+        "precision_at_20": 0.13571428571428573,
+        "hit_rate": 0.7142857142857143,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.010714285714285714,
+        "mean_recommended_training_users": 86.59642857142858,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.020337751952061014
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    },
+    "rp3beta_03": {
+      "movie": {
+        "ndcg_at_20": 0.20206196169461424,
+        "recall_at_20": 0.07102078716040963,
+        "precision_at_20": 0.1464285714285714,
+        "hit_rate": 0.7142857142857143,
+        "relevant_catalog_coverage": 0.63202450958504,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 94.67857142857143,
+        "mean_results": 20.0,
+        "users": 14,
+        "catalog_coverage": 0.018521881242055567
+      },
+      "tv": {
+        "ndcg_at_20": 0.0,
+        "recall_at_20": 0.0,
+        "precision_at_20": 0.0,
+        "hit_rate": 0.0,
+        "relevant_catalog_coverage": 0.0,
+        "long_tail_fraction": 0.0,
+        "mean_recommended_training_users": 0.0,
+        "mean_results": 0.0,
+        "users": 0,
+        "catalog_coverage": 0.0
+      }
+    }
+  },
+  "validation": {
+    "movie": {
+      "ndcg_at_20": 0.20206196169461424,
+      "recall_at_20": 0.07102078716040963,
+      "precision_at_20": 0.1464285714285714,
+      "hit_rate": 0.7142857142857143,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 94.67857142857143,
+      "mean_results": 20.0,
+      "users": 14,
+      "catalog_coverage": 0.018521881242055567
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test": {
+    "movie": {
+      "ndcg_at_20": 0.1597523072110529,
+      "recall_at_20": 0.06953035206525669,
+      "precision_at_20": 0.13333333333333328,
+      "hit_rate": 0.5333333333333333,
+      "relevant_catalog_coverage": 0.7028382719074161,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 119.59499999999998,
+      "mean_results": 20.0,
+      "users": 30,
+      "catalog_coverage": 0.023660294578502036
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "validation_popularity": {
+    "movie": {
+      "ndcg_at_20": 0.10865207279656279,
+      "recall_at_20": 0.0428770964448856,
+      "precision_at_20": 0.08214285714285716,
+      "hit_rate": 0.6428571428571429,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 105.51071428571427,
+      "mean_results": 20.0,
+      "users": 14,
+      "catalog_coverage": 0.01525331396404576
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test_popularity": {
+    "movie": {
+      "ndcg_at_20": 0.1445653868801772,
+      "recall_at_20": 0.06106635801616004,
+      "precision_at_20": 0.11666666666666667,
+      "hit_rate": 0.4666666666666667,
+      "relevant_catalog_coverage": 0.7028382719074161,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 135.02333333333337,
+      "mean_results": 20.0,
+      "users": 30,
+      "catalog_coverage": 0.01989971795675337
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "validation_current": {
+    "movie": {
+      "ndcg_at_20": 0.3003153620919338,
+      "recall_at_20": 0.15305074346788955,
+      "precision_at_20": 0.2642857142857143,
+      "hit_rate": 0.9285714285714286,
+      "relevant_catalog_coverage": 0.63202450958504,
+      "long_tail_fraction": 0.09285714285714287,
+      "mean_recommended_training_users": 45.010714285714286,
+      "mean_results": 20.0,
+      "users": 14,
+      "catalog_coverage": 0.02978027964408934
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "test_current": {
+    "movie": {
+      "ndcg_at_20": 0.34805813814488634,
+      "recall_at_20": 0.1524094658298176,
+      "precision_at_20": 0.2849999999999999,
+      "hit_rate": 0.8666666666666667,
+      "relevant_catalog_coverage": 0.7028382719074161,
+      "long_tail_fraction": 0.065,
+      "mean_recommended_training_users": 55.11333333333333,
+      "mean_results": 20.0,
+      "users": 30,
+      "catalog_coverage": 0.03854591037292385
+    },
+    "tv": {
+      "ndcg_at_20": 0.0,
+      "recall_at_20": 0.0,
+      "precision_at_20": 0.0,
+      "hit_rate": 0.0,
+      "relevant_catalog_coverage": 0.0,
+      "long_tail_fraction": 0.0,
+      "mean_recommended_training_users": 0.0,
+      "mean_results": 0.0,
+      "users": 0,
+      "catalog_coverage": 0.0
+    }
+  },
+  "paired_ndcg_gain_intervals": {
+    "movie": {
+      "validation_popularity": {
+        "users": 14,
+        "mean": 0.09340988889805144,
+        "lower_95": 0.04273879796883917,
+        "upper_95": 0.1445670266516035
+      },
+      "validation_current": {
+        "users": 14,
+        "mean": -0.09825340039731964,
+        "lower_95": -0.16328342587015654,
+        "upper_95": -0.03865037861854023
+      },
+      "test_popularity": {
+        "users": 30,
+        "mean": 0.015186920330875675,
+        "lower_95": -0.018584325835149476,
+        "upper_95": 0.04751243352438988
+      },
+      "test_current": {
+        "users": 30,
+        "mean": -0.18830583093383338,
+        "lower_95": -0.3101381974003555,
+        "upper_95": -0.06396030595974582
+      }
+    },
+    "tv": {
+      "validation_popularity": {
+        "users": 0,
+        "mean": 0.0,
+        "lower_95": null,
+        "upper_95": null
+      },
+      "validation_current": {
+        "users": 0,
+        "mean": 0.0,
+        "lower_95": null,
+        "upper_95": null
+      },
+      "test_popularity": {
+        "users": 0,
+        "mean": 0.0,
+        "lower_95": null,
+        "upper_95": null
+      },
+      "test_current": {
+        "users": 0,
+        "mean": 0.0,
+        "lower_95": null,
+        "upper_95": null
+      }
+    }
+  },
+  "bootstrap": {
+    "samples": 2000,
+    "seed": 42,
+    "unit": "eligible user",
+    "interpretation": "Paired percentile bootstrap; validation intervals are exploratory after configuration selection."
+  },
+  "approved_media": [],
+  "blocked_media": {
+    "movie": [
+      "Fewer than 50 eligible users in validation or held-out window",
+      "validation: NDCG gain over both baselines is below 0.005",
+      "held_out: NDCG gain over both baselines is below 0.005",
+      "validation_current: paired NDCG gain is not positive at the 95% bootstrap interval lower bound",
+      "test_popularity: paired NDCG gain is not positive at the 95% bootstrap interval lower bound",
+      "test_current: paired NDCG gain is not positive at the 95% bootstrap interval lower bound"
+    ],
+    "tv": [
+      "Fewer than 50 eligible users in validation or held-out window",
+      "validation: NDCG gain over both baselines is below 0.005",
+      "held_out: NDCG gain over both baselines is below 0.005",
+      "validation_popularity: paired NDCG gain is not positive at the 95% bootstrap interval lower bound",
+      "validation_current: paired NDCG gain is not positive at the 95% bootstrap interval lower bound",
+      "test_popularity: paired NDCG gain is not positive at the 95% bootstrap interval lower bound",
+      "test_current: paired NDCG gain is not positive at the 95% bootstrap interval lower bound"
+    ]
+  },
+  "protocol": "Global temporal 70/15/15; ties in later windows; select configuration independently per media on validation only; refit on development before held-out evaluation; all seen titles excluded; at least three prior positives per media; zero-result users included; independent movie/TV matrices; six SVD/cosine/RP3beta configurations; similarities require two shared users and shrinkage=5; minimum 50 users per media/window, NDCG gain >=0.005 over popularity and shipped graph, and positive paired-bootstrap lower bounds for both comparators in both windows. TMDB live retrieval is not evaluated by this offline protocol.",
+  "limitations": [
+    "Public MovieLens ratings are not consented TheMovie feedback; there is no TV interaction data.",
+    "This repeats an already-inspected chronological holdout and is an exploratory experiment, not a fresh independent evaluation.",
+    "Only 14 validation and 30 later-window users qualify; the paired 95% NDCG-gain interval against popularity crosses zero.",
+    "The candidate does not beat the retrospective shipped graph; that comparator lacks verified historical training-cutoff provenance.",
+    "Long-tail fraction is zero under the declared bottom-80% catalog definition; average training-user frequency alone does not establish diverse recommendations.",
+    "Live TMDB retrieval, private profile weighting and diversity reranking are not evaluated; no production or TV quality improvement is established."
+  ],
+  "decision": "Experimental only. No feedback artifact promoted; currently consented app data and new observation windows are required."
+}

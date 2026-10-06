@@ -95,9 +95,9 @@ three positive history titles per media type, and 50 eligible users of that type
 in both chronological evaluation windows. Those are minimum gates, not a promise
 that the data is sufficient to learn useful taste patterns.
 
-The trainer compares four candidates: SVD with 32 components, SVD with 32 or 64
-components and inverse-frequency weights, and item cosine with inverse-frequency
-weights. Movie and TV configurations are chosen independently on validation.
+The trainer compares six candidates: SVD with 32 components, SVD with 32 or 64
+components and inverse-frequency weights, item cosine with inverse-frequency
+weights, and two RP3β-style popularity-adjusted graphs. Movie and TV configurations are chosen independently on validation.
 Repeated behavioral events are capped per title/kind/day. Episode counts have
 bounded influence. Explicit ratings and dismissals are tracked separately;
 restoring a hidden title cancels the dismissal, and deleting a standalone rating
@@ -115,7 +115,9 @@ a common prior so a single high vote does not dominate discovery.
 Candidate reports record input SHA-256, dependency versions, selected settings,
 NDCG, recall, precision, hit rate, catalog coverage, and blocked promotion reasons.
 Promotion requires a minimum NDCG gain of 0.005 over both comparison graphs in
-both windows. The shipped graph is a retrospective comparator with unverified
+both windows, plus a positive lower bound in paired 95% bootstrap gain intervals.
+Movie and TV training matrices are now fitted independently; see the new
+experiment below for the additional graph candidates. The shipped graph is a retrospective comparator with unverified
 historical training provenance; it must not be presented as a leakage-free
 MovieLens baseline. The live TMDB pipeline requires its own online evaluation.
 
@@ -151,3 +153,49 @@ Full aggregate results and limitations are in
 
 Sources: [TruncatedSVD](https://scikit-learn.org/stable/modules/generated/sklearn.decomposition.TruncatedSVD.html),
 [TMDB discovery](https://developer.themoviedb.org/reference/discover-movie).
+
+## Graph-model iteration
+
+The feedback trainer now includes two RP3β-style graph candidates (`beta=0.3`
+and `beta=0.6`, `alpha=1`) alongside the existing SVD and cosine candidates.
+The hypothesis is that penalizing target popularity can reduce blockbuster
+dominance without losing relevant titles. This is an experiment, not a measured
+production improvement. The method is inspired by
+[Christoffel et al., RecSys 2015](https://recsys.acm.org/recsys15/session-4b/).
+
+Movie and TV interactions fit separate matrices, normalizations, frequency
+weights and embeddings. Numeric movie/TV IDs never mix. The graph candidates
+use binary transition matrices, preserving distinct-user support; behavioral
+confidence still weights the user's history during recommendation evaluation.
+Exports row-max-scale graph weights and shrink by shared support. These are
+ranking weights, not click probabilities or an exact reproduction of the
+paper's deployment. No dense full-catalog inverse is needed.
+
+Reports include NDCG/recall/precision/hit rate, catalog coverage, average number
+of results, fraction of recommendations in the bottom 80% of the training
+media catalog by distinct positive users, and mean recommended training-user
+frequency. Small/empty result sets must be read alongside those measures.
+Paired bootstrap intervals use 2,000 resamples of eligible users with seed 42;
+validation intervals after configuration selection are exploratory.
+
+Candidate files default to unique timestamped paths. Existing candidates, input
+exports and files inside `src/` cannot be overwritten using `--output`.
+`--promote` retains data, cohort, ranking-gain and uncertainty gates; public
+MovieLens benchmark input cannot be promoted. Metrics from repeated runs on
+the already-inspected MovieLens holdout are exploratory, not a fresh independent
+test. A production claim requires a new consented observation window and
+evaluation of the application's live retrieval/ranking path.
+
+### Result of this graph experiment
+
+RP3β-style `beta=0.3` wins validation at NDCG@20 **0.20206**, compared with
+**0.16123** for item cosine. On the reused later window, it scores **0.15975**
+versus **0.14457** for popularity. The paired gain interval is
+**[-0.01858, 0.04751]**, so a positive gain is not established at this interval.
+Only 14 validation and 30 later-window users qualify. The candidate also loses
+to the retrospective shipped comparator. No model is promoted. The declared
+long-tail fraction is zero; this does not establish better long-tail discovery.
+
+Aggregate metrics, all validation candidates and limitations are recorded in
+[rp3beta-movielens-benchmark.json](metrics/rp3beta-movielens-benchmark.json).
+These remain exploratory public-data results, with no TV or production claim.

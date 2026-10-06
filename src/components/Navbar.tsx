@@ -103,7 +103,7 @@ export function Navbar() {
         { name: "Library", href: "/library", icon: Library },
     ];
     const isLinkActive = (href: string) => href === "/library"
-        ? ["/library", "/lists", "/diary"].some(path => pathname === path || pathname.startsWith(path + "/"))
+        ? ["/library", "/lists", "/diary", "/calendar"].some(path => pathname === path || pathname.startsWith(path + "/"))
         : pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
     return (

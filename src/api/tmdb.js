@@ -318,3 +318,15 @@ export const getBackdropUrl = (path) => getImageUrl(path, "original");
 
 // Helper to get poster URL
 export const getPosterUrl = (path, size = "w500") => getImageUrl(path, size);
+
+// Strict, cancellable requests for release-calendar data.
+export const getCalendarMovies = (params, options = {}) =>
+    fetchFromApi('/discover/movie', params, { ...options, throwOnError: true });
+export const getCalendarMovie = (id, options = {}) =>
+    fetchFromApi(`/movie/${id}`, { append_to_response: 'release_dates' }, { ...options, throwOnError: true });
+export const getCalendarShow = (id, options = {}) =>
+    fetchFromApi(`/tv/${id}`, {}, { ...options, throwOnError: true });
+export const getCalendarSeason = (id, season, options = {}) =>
+    fetchFromApi(`/tv/${id}/season/${season}`, {}, { ...options, throwOnError: true });
+export const getCalendarCountries = (options = {}) =>
+    fetchFromApi('/configuration/countries', {}, { ...options, throwOnError: true });

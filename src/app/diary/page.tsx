@@ -50,6 +50,7 @@ function DiaryContent() {
 
     const visible = useMemo(() => entries.filter((entry) => (!month || entry.watchedOn.startsWith(month)) && (!filter || entry.item.title.toLowerCase().includes(filter.toLowerCase()))), [entries, month, filter]);
     const stats = diaryStats(visible, entries);
+    const knownMovieMinutes = visible.filter(entry => entry.item.type === "movie").reduce((sum,entry) => sum + Math.max(0, Number(entry.item.runtime) || 0),0);
     const months = [...new Set(entries.map((entry) => entry.watchedOn.slice(0, 7)))].sort().reverse();
     const field = "rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white";
 
@@ -57,7 +58,7 @@ function DiaryContent() {
         <main className="min-h-screen bg-bg-main pt-32 pb-20">
             <div className="container mx-auto space-y-8 px-4 sm:px-6 lg:px-20">
                 <LibraryNav active="diary" />
-                <header><h1 className="text-3xl font-display font-bold text-white">Watch Diary</h1><p className="mt-2 text-text-secondary">Log each viewing, remember your thoughts, and keep track of rewatches. Your notes are private.</p><p role="status" className="mt-2 text-xs text-text-muted">{status}</p></header>
+                <header><h1 className="text-3xl font-display font-bold text-white">Watch Diary</h1><p className="mt-2 text-text-secondary">Log each viewing, remember your thoughts, and keep track of rewatches. Your notes are private.</p><p role="status" className="mt-2 text-xs text-text-muted">{status}</p><Link href="/diary/insights" className="mt-3 inline-flex min-h-11 items-center rounded-full bg-white/5 px-4 text-sm text-accent-primary">Explore diary insights →</Link></header>
                 <section className="rounded-xl border border-white/10 bg-bg-card p-5">
                     <h2 className="mb-3 text-lg font-bold text-white">Log a watch</h2>
                     <label className="block text-sm text-text-secondary">Find a movie or show<input className={`${field} mt-2 w-full`} value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null); }} placeholder="Search by title" /></label>
@@ -70,7 +71,7 @@ function DiaryContent() {
                     <label className="text-sm text-white">Month<select value={month} onChange={(event) => setMonth(event.target.value)} className={`${field} ml-2`}><option value="">All time</option>{months.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
                     <input aria-label="Filter diary by title" className={field} placeholder="Filter logged titles" value={filter} onChange={(event) => setFilter(event.target.value)} />
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Viewings", stats.entries], ["Different titles", stats.unique], ["Rewatches", stats.rewatches], ["Known watch time", `${Math.round(stats.minutes / 60 * 10) / 10} hours`]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-white/10 bg-white/5 p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 text-xl font-bold text-white">{value}</p></div>)}</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Viewings", stats.entries], ["Different titles", stats.unique], ["Rewatches", stats.rewatches], ["Known movie time", `${Math.round(knownMovieMinutes / 60 * 10) / 10} hours`]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-white/10 bg-white/5 p-4"><p className="text-xs text-text-muted">{label}</p><p className="mt-1 text-xl font-bold text-white">{value}</p></div>)}</div>
                 {loading ? <p className="text-text-muted">Loading diary…</p> : !visible.length ? <p className="rounded-xl bg-white/5 p-8 text-center text-text-secondary">No watches logged for this selection. Start with a title above or log directly from its details page.</p> : <div className="space-y-4">{visible.map((entry) => <article key={entry.id} className="rounded-xl border border-white/10 bg-bg-card p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3"><div><Link className="font-bold text-white hover:text-accent-primary" href={`/${entry.item.type}/${entry.item.id}`}>{entry.item.title}</Link><p className="mt-1 text-sm text-text-muted">{entry.watchedOn} · {entry.item.type === "tv" ? "TV" : "Movie"}{entry.rating ? ` · ${entry.rating}/10` : ""}</p></div><div className="flex gap-3"><button className="text-sm text-accent-primary" onClick={() => setEditing(editing === entry.id ? null : entry.id)}>{editing === entry.id ? "Cancel editing" : "Edit"}</button><button className="text-sm text-text-muted" onClick={() => setDeleting(entry.id)}>Remove</button></div></div>
                     {entry.notes && editing !== entry.id && <p className="mt-3 whitespace-pre-wrap text-sm text-text-secondary">{entry.notes}</p>}
