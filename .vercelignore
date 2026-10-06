@@ -8,3 +8,6 @@ ml/data/
 ml/private/
 __pycache__/
 *.py[cod]
+
+# Local provider configuration and downloaded credentials
+.vercel/

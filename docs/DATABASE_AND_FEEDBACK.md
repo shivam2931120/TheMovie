@@ -129,3 +129,24 @@ use a promoted TV feedback graph; otherwise it works from TMDB/content similarit
   produce no learning events.
 - Review mobile widths (320, 390, 768), keyboard navigation, dialog focus/Escape,
   reduced motion, touch actions, and zoom reflow with the actual authenticated app.
+
+## Hosted database connected on 2026-10-06
+
+The `themovie` Vercel project now has a dedicated Neon resource named
+`themovie-prod`, on the Marketplace `free_v3` plan, in `iad1`. Only Production
+was connected. Existing projects' database resources and local `.env.local`
+were preserved. Neon built-in authentication was disabled; Clerk remains the
+application's authentication provider.
+
+A TLS connection with certificate verification succeeded. The existing schema
+migration created `account_features`, `recommendation_events`,
+`recommendation_rate_limits` and `account_deletions` on the hosted database.
+The original sync warning was caused by missing Production `DATABASE_URL`.
+The warning now uses neutral service-failure wording rather than attributing
+all failures to the user's internet connection. Client recovery snapshots and
+pending account edits remain in place for retry after deployment.
+
+Downloaded production credentials live only in ignored `.vercel/` configuration,
+which is explicitly excluded from deployment uploads. No credential values or
+account records are included in this document. Authenticated save verification
+and deletion-webhook configuration are distinct from database readiness.
