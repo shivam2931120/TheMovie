@@ -358,6 +358,7 @@ function ProfileContent() {
                     </div>
                 )}
 
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-bg-card p-5"><div><h2 className="font-semibold text-white">Refine your recommendations</h2><p className="mt-1 text-sm text-text-secondary">Rate titles you know, choose genres and save your streaming services.</p></div><Link href="/taste" className="inline-flex min-h-11 items-center rounded-lg bg-white/5 px-4 text-sm text-accent-primary">Set up your taste →</Link></div>
                 {/* Ratings Dashboard */}
                 <div className="bg-bg-card border border-white/5 p-6 rounded-2xl mb-8 sm:mb-10">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">

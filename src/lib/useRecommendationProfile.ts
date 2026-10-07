@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect,useMemo, useState } from "react";
 import { useTVWatchProgress } from "@/context/TVWatchProgressContext";
 import { useProfilePreferences } from "@/context/ProfilePreferencesContext";
 import { WatchlistContext } from "@/context/watchlist-context";
@@ -10,6 +10,7 @@ import { useRatings } from "@/context/ReviewContext";
 import { useDiary } from "@/context/DiaryContext";
 import { useLists } from "@/context/ListsContext";
 import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
+import { isHidden } from './recommendationPreferences';
 
 export function useRecommendationProfile(mediaType: "movie" | "tv" = "movie") {
     const { items } = useContext(WatchlistContext) as any;
@@ -21,7 +22,13 @@ export function useRecommendationProfile(mediaType: "movie" | "tv" = "movie") {
     const { lists } = useLists() as any;
     const { preferences: profilePreferences } = useProfilePreferences();
     const { preferences } = useRecommendationPreferences();
-    const [now] = useState(() => Date.now());
+    const [now,setNow] = useState(() => Date.now());
+    useEffect(()=>{
+        const expiries=preferences.dismissed.filter(item=>item.reason==='later'&&item.until&&Date.parse(item.until)>now).map(item=>Date.parse(item.until!));
+        if(!expiries.length)return;
+        const timer=setTimeout(()=>setNow(Date.now()),Math.min(2147483647,Math.max(1000,Math.min(...expiries)-Date.now()+50)));
+        return()=>clearTimeout(timer);
+    },[preferences.dismissed,now]);
     return useMemo(() => {
         const seeds: any[] = [];
         const negatives: any[] = [];
@@ -54,7 +61,7 @@ export function useRecommendationProfile(mediaType: "movie" | "tv" = "movie") {
         for (const item of (items || []).slice(0, 15)) add(item, 1.1, "watchlist",item.addedAt);
         for (const item of (recentlyViewed || []).slice(0, 8)) add(item, 0.35, "viewed", item.viewedAt);
         for (const list of lists || []) for (const item of (list.movies || []).slice(0, 4)) add(item, 0.7, "saved");
-        for (const item of preferences.dismissed) if (item.type === mediaType) negatives.push({ id: item.id, weight: 1.25 });
+        for (const item of preferences.dismissed) if (item.type === mediaType && item.reason==='dislike') negatives.push({ id: item.id, weight: 1.25 });
         if (mediaType === "tv") for (const [id,seasons] of Object.entries(progress)) {
             const count = Object.values(seasons as any).reduce((sum:number,episodes:any)=>sum+Object.values(episodes||{}).filter(Boolean).length,0);
             if (count) add({id:Number(id),type:"tv"}, Math.min(2,0.5+Number(count)/20),"episode");
@@ -67,10 +74,10 @@ export function useRecommendationProfile(mediaType: "movie" | "tv" = "movie") {
         return {
             seeds: [...seedMap.values()].sort((a, b) => b.weight - a.weight).slice(0, 40), negatives: [...negativeMap.values()].slice(0, 40), favoriteGenres: Array.isArray(genres) ? genres.slice(0, 5) : [],
             exclude: [...new Set([
-                ...preferences.dismissed.filter((item) => item.type === mediaType).map((item) => item.id),
+                ...preferences.dismissed.filter((item) => item.type === mediaType && isHidden(item,now)).map((item) => item.id),
                 ...negatives.map((item) => item.id),
                 ...(preferences.hideWatched ? (watched || []).filter((item: any) => (item.type || "movie") === mediaType).map((item: any) => Number(item.id)) : []),
-            ])].slice(0, 2000), exploration: preferences.exploration,
+            ])].slice(0, 2000), exploration: preferences.exploration, streaming:preferences.streaming,
         };
     }, [items, watched, recentlyViewed, ratings, entries, lists, profilePreferences, preferences, now, mediaType, progress]);
 }

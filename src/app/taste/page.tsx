@@ -1,0 +1,37 @@
+"use client";
+import { useEffect,useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useUser } from '@clerk/nextjs';
+import { getPopularMovies,getPopularTV,searchMulti } from '@/api/tmdb';
+import { useRatings } from '@/context/ReviewContext';
+import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
+import { useProfilePreferences } from '@/context/ProfilePreferencesContext';
+import { MOVIE_GENRES } from '@/lib/recommendationCatalog';
+import { StreamingSettings } from '@/components/StreamingSettings';
+export default function TastePage(){const {user}=useUser();return <TasteSetup key={user?.id||'guest'}/>;}
+function TasteSetup(){
+    const {upsertRating,getRatingForItem,loading:ratingsLoading}=useRatings() as any;
+    const {preferences,setPreferences,loading,status}=useRecommendationPreferences();
+    const {preferences:profile,setPreferences:setProfile,loading:profileLoading}=useProfilePreferences();
+    const [query,setQuery]=useState(''),[items,setItems]=useState<any[]>([]),[media,setMedia]=useState('all'),[busy,setBusy]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+    const [selected,setSelected]=useState<Record<string,{item:any;rating:number}>>({}),[saved,setSaved]=useState(false),[saving,setSaving]=useState(false);
+    useEffect(()=>{let active=true;setBusy(true);setError('');
+        const timer=setTimeout(()=>{const job=query.trim().length>=2?searchMulti(query.trim()):Promise.all([getPopularMovies(),getPopularTV()]).then(([movies,tv])=>({results:[...(movies?.results||[]).slice(0,10).map((item:any)=>({...item,media_type:'movie'})),...(tv?.results||[]).slice(0,10).map((item:any)=>({...item,media_type:'tv'}))]}));
+            job.then(data=>{if(!active)return;const results=(data?.results||[]).filter((item:any)=>['movie','tv'].includes(item.media_type));setItems(results);if(!results.length)setError('No titles found. Try another search.');}).catch(()=>{if(active){setItems([]);setError('Titles could not be loaded. Try again.');}}).finally(()=>{if(active)setBusy(false);});},300);
+        return()=>{active=false;clearTimeout(timer);};
+    },[query,retry]);
+    const picks=Object.values(selected);
+    const choose=(item:any,rating:number)=>{const type=item.media_type||item.type;const key=`${type}:${item.id}`;setSaved(false);setSelected(current=>{const next={...current};if(!rating)delete next[key];else if(next[key]||Object.keys(next).length<10)next[key]={item:{...item,type},rating};return next;});};
+    const save=async()=>{setSaving(true);setError('');try{await Promise.all(picks.map(pick=>upsertRating(pick.item,pick.rating)));setPreferences({onboardingCompleted:true});setSaved(true);}catch{setError('Your taste profile could not be saved. Please retry.');}finally{setSaving(false);}};
+    const field='min-h-11 rounded-lg border border-white/15 bg-bg-card px-3 py-2 text-white';
+    return <main className="min-h-screen bg-bg-main pb-28 pt-28"><div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6"><header><h1 className="text-3xl font-bold text-white">Set up your taste</h1><p className="mt-2 text-text-secondary">Rate 5–10 titles you know. Include a few you disliked so your recommendations learn both sides of your taste.</p><Link href="/" className="inline-flex min-h-11 items-center text-sm text-accent-primary">Skip for now →</Link></header>
+        <section className="rounded-xl border border-white/10 p-5"><h2 className="font-bold text-white">Favorite genres · {profile.favoriteGenres.length}/5</h2><div className="mt-3 flex flex-wrap gap-2">{[...new Set(Object.values(MOVIE_GENRES))].map(genre=><button key={genre} disabled={profileLoading||(!profile.favoriteGenres.includes(genre)&&profile.favoriteGenres.length>=5)} aria-pressed={profile.favoriteGenres.includes(genre)} className={`${field} ${profile.favoriteGenres.includes(genre)?'border-accent-primary text-accent-primary':''} disabled:opacity-40`} onClick={()=>setProfile({...profile,favoriteGenres:profile.favoriteGenres.includes(genre)?profile.favoriteGenres.filter(value=>value!==genre):[...profile.favoriteGenres,genre]})}>{genre}</button>)}</div></section>
+        <div className="flex flex-wrap gap-3"><input aria-label="Search titles to rate" className={`${field} min-w-0 flex-1`} placeholder="Find a movie or show you know" value={query} onChange={event=>setQuery(event.target.value)}/><select aria-label="Title type" className={field} value={media} onChange={event=>setMedia(event.target.value)}><option value="all">Movies & TV</option><option value="movie">Movies</option><option value="tv">TV</option></select><button className={field} onClick={()=>setRetry(value=>value+1)}>Refresh titles</button></div>
+        {error&&<p role="alert" className="text-amber-300">{error}</p>}
+        {busy?<p role="status" className="text-text-secondary">Loading titles…</p>:<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{items.filter(item=>media==='all'||item.media_type===media).map(item=>{const key=`${item.media_type}:${item.id}`;const previous=getRatingForItem(item.id,item.media_type);return <article key={key} className="overflow-hidden rounded-xl border border-white/10 bg-bg-card">{item.poster_path&&<Image unoptimized src={`https://image.tmdb.org/t/p/w342${item.poster_path}`} alt="" width={342} height={513} className="aspect-[2/3] w-full object-cover"/>}<div className="space-y-2 p-3"><h2 className="text-sm font-semibold text-white">{item.title||item.name}</h2><p className="text-xs text-text-muted">{item.media_type==='tv'?'TV':'Movie'}{previous?` · Currently ${previous.rating}/10`:''}</p><label className="text-xs text-text-secondary">Your rating<select className={`${field} mt-1 w-full`} disabled={loading||ratingsLoading||saving||(!selected[key]&&picks.length>=10)} value={selected[key]?.rating||0} onChange={event=>choose(item,Number(event.target.value))}><option value={0}>Choose / remove</option>{Array.from({length:10},(_,index)=><option key={index+1} value={index+1}>{index+1}/10</option>)}</select></label></div></article>;})}</div>}
+        <section className="rounded-xl border border-white/10 p-5"><h2 className="font-bold text-white">Selected titles · {picks.length}/10</h2><ul className="mt-2 space-y-2">{picks.map(pick=><li key={`${pick.item.type}:${pick.item.id}`} className="flex items-center justify-between gap-3 text-sm text-text-secondary"><span>{pick.item.title||pick.item.name} · {pick.rating}/10</span><button disabled={saving} className="min-h-11 text-accent-primary" onClick={()=>choose(pick.item,0)}>Remove</button></li>)}</ul><button disabled={loading||ratingsLoading||saving||picks.length<5} className="mt-3 min-h-11 rounded-lg bg-accent-surface px-5 font-semibold text-white disabled:opacity-40" onClick={()=>void save()}>{saving?'Saving…':'Use these ratings'}</button><p role="status" className="mt-2 text-xs text-text-muted">{saved?`Taste profile updated. ${status}`:'Choose at least 5 titles. These ratings appear in your ratings dashboard; no watches are logged automatically.'}</p>{saved&&<Link href="/" className="inline-flex min-h-11 items-center text-accent-primary">See your recommendations →</Link>}</section>
+        <section className="rounded-xl border border-white/10 p-5"><StreamingSettings/></section>
+        {preferences.onboardingCompleted&&<p className="text-xs text-text-muted">You can revisit this page any time to refine your taste.</p>}
+    </div></main>;
+}

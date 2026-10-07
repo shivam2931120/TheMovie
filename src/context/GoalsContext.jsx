@@ -1,17 +1,17 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { createContext, useContext } from "react";
 import { useAccountFeature } from "@/lib/useAccountFeature";
 
 const GoalsContext = createContext();
 
 const INITIAL={monthly:10,yearly:100};
-const normalize=value=>({monthly:Math.max(1,Math.min(10000,Number(value?.monthly)||10)),yearly:Math.max(1,Math.min(10000,Number(value?.yearly)||100))});
+const count=(value,fallback)=>Number.isFinite(Number(value))&&Number(value)>0?Math.max(1,Math.min(10000,Math.round(Number(value)))):fallback;
+const normalize=value=>({monthly:count(value?.monthly,10),yearly:count(value?.yearly,100)});
 const merge=(a,b)=>({...b,...a});
 export function GoalsProvider({children}) {
-    const {data:goals,update,loading}=useAccountFeature('watchGoals',INITIAL,merge,normalize);
-    return <GoalsContext.Provider value={{goals,loading,updateGoals:patch=>update(current=>({...current,...patch}))}}>{children}</GoalsContext.Provider>;
+    const {data:goals,update,loading,status}=useAccountFeature('watchGoals',INITIAL,merge,normalize);
+    return <GoalsContext.Provider value={{goals,loading,status,updateGoals:patch=>update(current=>({...current,...patch}))}}>{children}</GoalsContext.Provider>;
 }
 
 export function useGoals() {

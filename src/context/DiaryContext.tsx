@@ -6,14 +6,14 @@ import { DiaryEntry, DiaryItem, isValidDiaryDate, mergeDiary, normalizeDiary } f
 import { WatchedContext } from "@/context/WatchedContext";
 
 const EMPTY: DiaryEntry[] = [];
-type DiaryActions = { entries: DiaryEntry[]; loading: boolean; status: string; owner: string; saveEntry: (item: any, watchedOn: string, rating: number, notes: string, entryId?: string) => void; removeEntry: (id: string) => void };
+type DiaryActions = { entries: DiaryEntry[]; loading: boolean; status: string; owner: string; saveEntry: (item: any, watchedOn: string, rating: number, notes: string, entryId?: string, rewatch?: boolean) => void; removeEntry: (id: string) => void };
 const DiaryContext = createContext<DiaryActions | null>(null);
 
 export function DiaryProvider({ children }: { children: React.ReactNode }) {
     const { data, update, loading, status, owner } = useAccountFeature("watchDiary", EMPTY, mergeDiary, normalizeDiary);
     const { addWatched } = useContext(WatchedContext) as any;
     const entries = Array.isArray(data) ? data : EMPTY;
-    const saveEntry = useCallback((item: any, watchedOn: string, rating: number, notes: string, entryId?: string) => {
+    const saveEntry = useCallback((item: any, watchedOn: string, rating: number, notes: string, entryId?: string,rewatch?:boolean) => {
         if (!Number.isInteger(Number(item?.id)) || Number(item.id) <= 0 || !isValidDiaryDate(watchedOn)) {
             throw new Error("Choose a title and a valid date that is not in the future.");
         }
@@ -27,7 +27,7 @@ export function DiaryProvider({ children }: { children: React.ReactNode }) {
         const id = entryId || crypto.randomUUID();
         update((current) => {
             const existing = current.find((entry) => entry.id === id);
-            const next: DiaryEntry = { id, item: savedItem, watchedOn, rating: Math.max(0, Math.min(10, Number(rating) || 0)), notes: notes.slice(0, 1000), createdAt: existing?.createdAt || timestamp, updatedAt: timestamp };
+            const next: DiaryEntry = { id, item: savedItem, watchedOn, rating: Math.max(0, Math.min(10, Number(rating) || 0)), notes: notes.slice(0, 1000), createdAt: existing?.createdAt || timestamp, updatedAt: timestamp,rewatch:rewatch??existing?.rewatch };
             return mergeDiary(current.filter((entry) => entry.id !== id), [next]);
         });
         addWatched?.({ ...savedItem, type: savedItem.type });

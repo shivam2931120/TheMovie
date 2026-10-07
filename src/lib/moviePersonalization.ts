@@ -3,6 +3,7 @@ import { getMovieDetails,getMovieRecommendations,getMovieSummaries,getDiscoverMo
 import { rankRecommendations,type RecommendationProfile } from './recommendationRanker';
 import { catalogEntry,MOVIE_GENRES } from './recommendationCatalog';
 import type { NeighborGraph } from './recommendationGraph';
+import { applyStreamingPreferences,streamingDiscoverParams } from './streamingPersonalization';
 
 /** Fresh TMDB candidates and seed metadata extend the offline movie catalog. */
 export async function personalizedMovies(profile:RecommendationProfile,signal?:AbortSignal,currentId?:number,query='') {
@@ -27,7 +28,7 @@ export async function personalizedMovies(profile:RecommendationProfile,signal?:A
             for(const candidate of candidates)catalog.set(candidate.id,{...candidate,type:'movie'});
         }),
         (async()=>{
-            const data=await getDiscoverMovies({sort_by:'popularity.desc','vote_count.gte':50,...(genreIds.length?{with_genres:genreIds.join('|')}:{})});
+            const data=await getDiscoverMovies({sort_by:'popularity.desc','vote_count.gte':50,...(genreIds.length?{with_genres:genreIds.join('|')}:{}),...streamingDiscoverParams(profile.streaming)});
             if(!signal?.aborted)for(const item of data?.results||[])if(item?.poster_path)catalog.set(item.id,{...item,type:'movie'});
         })(),
     ]);
@@ -52,6 +53,7 @@ export async function personalizedMovies(profile:RecommendationProfile,signal?:A
     const hydrated=await getMovieSummaries(missing,20);
     if(signal?.aborted)return [];
     for(const item of hydrated)catalog.set(item.id,{...item,type:'movie'});
-    return ranked.map((entry:any)=>({...catalog.get(entry.id),recommendationReason:entry.reason,recommendationModel:model,recommendationRequestId:requestId}))
+    const items=ranked.map((entry:any)=>({...catalog.get(entry.id),recommendationReason:entry.reason,recommendationModel:model,recommendationRequestId:requestId}))
         .filter((item:any)=>item?.id&&item.poster_path&&(item.title||item.name));
+    return applyStreamingPreferences(items,'movie',profile.streaming,signal);
 }

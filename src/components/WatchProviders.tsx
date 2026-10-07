@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ExternalLink, MapPin } from "lucide-react";
+import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
 
 interface Provider {
     provider_id: number;
@@ -34,6 +35,7 @@ const PROVIDER_GROUPS: Array<{ key: keyof ProviderRegion; label: string }> = [
 ];
 
 export function WatchProviders({ providers, availableRegions, selectedRegion, onRegionChange }: WatchProvidersProps) {
+    const {preferences}=useRecommendationPreferences();
     const hasProviders = PROVIDER_GROUPS.some(({ key }) => Array.isArray(providers?.[key]) && providers?.[key]?.length);
 
     return (
@@ -81,6 +83,7 @@ export function WatchProviders({ providers, availableRegions, selectedRegion, on
                                             />
                                             <span className="max-w-[120px] truncate text-xs font-medium text-white">
                                                 {provider.provider_name}
+                                                {key==='flatrate'&&selectedRegion===preferences.streaming.country&&preferences.streaming.providers.includes(provider.provider_id)&&<span className="block text-green-300">Your service</span>}
                                             </span>
                                         </div>
                                     ))}
@@ -106,6 +109,7 @@ export function WatchProviders({ providers, availableRegions, selectedRegion, on
                     No providers are listed for this region.
                 </div>
             )}
+            <p className="mt-4 text-xs text-text-muted">Availability data from <a className="underline" href="https://www.justwatch.com/" target="_blank" rel="noopener noreferrer">JustWatch</a>. Your default country is {preferences.streaming.country}.</p>
         </section>
     );
 }

@@ -10,20 +10,28 @@ import { WatchlistContext } from "@/context/watchlist-context";
 import { WatchedContext } from "@/context/WatchedContext";
 import { useTVWatchProgress } from "@/context/TVWatchProgressContext";
 import { getTVDetails } from "@/api/tmdb";
+import { nextUnwatchedEpisode } from '@/lib/nextEpisode';
+import { useActionNotice } from '@/components/ActionNotice';
 
 function ProgressCard({ id, count }: { id: string; count: number }) {
     const [show, setShow] = useState<any>(null);
+    const [next,setNext]=useState<any>(null),[busy,setBusy]=useState(true),[error,setError]=useState(false),[retry,setRetry]=useState(0);
+    const {progress,markEpisodeWatched,unmarkEpisodeWatched,isLoaded}=useTVWatchProgress();
+    const notify=useActionNotice();
+    const showProgress=JSON.stringify(progress[id]||{});
     useEffect(() => {
         let active = true;
-        getTVDetails(id).then(data => { if (active && data?.id) setShow(data); }).catch(() => {});
+        setBusy(true);setError(false);setNext(null);
+        getTVDetails(id).then(async data => {if(!data?.id)throw new Error('Show unavailable');if(active)setShow(data);const episode=await nextUnwatchedEpisode(data,JSON.parse(showProgress));if(active)setNext(episode);}).catch(()=>{if(active)setError(true);}).finally(()=>{if(active)setBusy(false);});
         return () => { active = false; };
-    }, [id]);
-    return <Link href={`/tv/${id}`} className="rounded-2xl border border-white/10 bg-bg-card p-5 hover:border-accent-primary/50">
+    }, [id,showProgress,retry]);
+    return <article className="rounded-2xl border border-white/10 bg-bg-card p-5 hover:border-accent-primary/50">
         <h2 className="font-semibold text-white">{show?.name || `Tracked series #${id}`}</h2>
         <p className="mt-2 text-sm text-text-secondary">{count} episode{count === 1 ? '' : 's'} watched{show?.number_of_episodes ? ` of ${show.number_of_episodes}` : ''}</p>
         {show?.number_of_episodes > 0 && <progress aria-label={`${show.name} watched episodes`} value={Math.min(count, show.number_of_episodes)} max={show.number_of_episodes} className="mt-3 w-full accent-accent-primary" />}
-        <span className="mt-3 inline-flex min-h-11 items-center text-sm text-accent-primary">Open episode tracker →</span>
-    </Link>;
+        {busy?<p role="status" className="mt-3 text-sm text-text-muted">Finding your next episode…</p>:error?<button className="min-h-11 text-sm text-amber-300" onClick={()=>setRetry(value=>value+1)}>Episode data unavailable · Retry</button>:next?<div className="mt-3"><p className="text-sm text-white">Continue watching · S{next.season_number} E{next.episode_number}</p><button disabled={!isLoaded} className="mt-2 min-h-11 rounded-lg bg-white/10 px-3 text-sm text-white disabled:opacity-40" onClick={()=>{markEpisodeWatched(Number(id),next.season_number,next.episode_number);notify('Episode marked watched',()=>unmarkEpisodeWatched(Number(id),next.season_number,next.episode_number));}}>Mark episode watched</button></div>:<p className="mt-3 text-sm text-text-secondary">Caught up with known aired episodes{show?.next_episode_to_air?.air_date?` · Next scheduled ${show.next_episode_to_air.air_date}`:''}.</p>}
+        <Link href={`/tv/${id}`} className="mt-3 inline-flex min-h-11 items-center text-sm text-accent-primary">Open episode tracker →</Link>
+    </article>;
 }
 
 function LibraryContent() {

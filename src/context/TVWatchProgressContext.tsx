@@ -24,7 +24,7 @@ const normalizeProgress = (value: unknown): Progress => {
 };
 const mergeProgress = (a: Progress,b: Progress) => mergeTVProgress(a,b) as Progress;
 export function TVWatchProgressProvider({ children }: { children: React.ReactNode }) {
-    const {data: progress,update: setProgress,loading} = useAccountFeature('tvProgress',EMPTY_PROGRESS,mergeProgress,normalizeProgress);
+    const {data: progress,update: setProgress,loading,status} = useAccountFeature('tvProgress',EMPTY_PROGRESS,mergeProgress,normalizeProgress);
     const ready = !loading;
     const markEpisodeWatched = useCallback((showId: number, season: number, episode: number) => {
         setProgress(prev => ({
@@ -115,8 +115,9 @@ export function TVWatchProgressProvider({ children }: { children: React.ReactNod
         getShowProgress,
         getSeasonProgress,
         progress,
+        status,
         isLoaded: ready
-    }), [markEpisodeWatched, unmarkEpisodeWatched, markSeasonWatched, clearSeason, isEpisodeWatched, getShowProgress, getSeasonProgress, progress, ready]);
+    }), [markEpisodeWatched, unmarkEpisodeWatched, markSeasonWatched, clearSeason, isEpisodeWatched, getShowProgress, getSeasonProgress, progress, ready,status]);
 
     return (
         <TVWatchProgressContext.Provider value={value}>

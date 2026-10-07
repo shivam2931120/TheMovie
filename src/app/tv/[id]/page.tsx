@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AIRecommendations } from "@/components/AIRecommendations";
 import { SignedIn, SignedOut, useClerk } from "@clerk/nextjs";
 import { useLists } from "@/context/ListsContext";
+import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
 
 export default function TVDetailsPage() {
     const { id } = useParams();
@@ -26,7 +27,9 @@ export default function TVDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [showTrailer, setShowTrailer] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedRegion, setSelectedRegion] = useState('US');
+    const {preferences}=useRecommendationPreferences();
+    const [regionOverride,setSelectedRegion]=useState<string|null>(null);
+    const selectedRegion=regionOverride||preferences.streaming.country;
     const [selectedVideo, setSelectedVideo] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'trailers' | 'clips' | 'behind'>('trailers');
 

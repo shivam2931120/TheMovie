@@ -1,8 +1,9 @@
 import { neighborValues, type NeighborGraph } from './recommendationGraph';
+import type { StreamingPreferences } from './recommendationPreferences';
 
 export type RecommendationSeed = { id: number; weight?: number; source?: string; label?: string };
 export type CatalogEntry = { id: number; title: string; genres?: string[]; quality?: number; votes?: number };
-export type RecommendationProfile = { seeds?: RecommendationSeed[]; negatives?: RecommendationSeed[]; exclude?: number[]; favoriteGenres?: string[]; exploration?: number; searchCandidates?: { id: number; score: number }[] };
+export type RecommendationProfile = { seeds?: RecommendationSeed[]; negatives?: RecommendationSeed[]; exclude?: number[]; favoriteGenres?: string[]; exploration?: number; searchCandidates?: { id: number; score: number }[]; streaming?: StreamingPreferences };
 export type RankedRecommendation = { id: number; score: number; reason: string };
 
 const positiveId = (value: unknown) => Number.isSafeInteger(Number(value)) && Number(value) > 0;

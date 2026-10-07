@@ -4,6 +4,8 @@ import { useId } from 'react';
 import { ChevronDown,SlidersHorizontal } from 'lucide-react';
 import { FeedbackSettings } from './FeedbackSettings';
 import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
+import Link from 'next/link';
+import { StreamingSettings } from './StreamingSettings';
 
 export function RecommendationSettings() {
     const { preferences, setPreferences, restore, loading, status } = useRecommendationPreferences();
@@ -18,6 +20,7 @@ export function RecommendationSettings() {
                 </summary>
                 <div className="border-t border-white/10 p-4 sm:p-5">
                     <p className="text-sm text-text-secondary">Rate what you watch and keep a diary to refine your picks. Choose a familiar mix or explore more genres.</p>
+                    <Link href="/taste" className="inline-flex min-h-11 items-center text-sm text-accent-primary">{preferences.onboardingCompleted?'Update your taste profile':'Set up your taste profile'} →</Link>
                     <div className="mt-4 grid gap-5 sm:grid-cols-2">
                         <label className="flex min-h-11 items-center gap-3 text-sm text-white"><input type="checkbox" checked={preferences.hideWatched} disabled={loading} onChange={event=>setPreferences({hideWatched:event.target.checked})}/>Hide watched titles</label>
                         <div>
@@ -29,9 +32,10 @@ export function RecommendationSettings() {
                     <p role="status" className="mt-2 text-xs text-text-muted">{status}</p>
                     {preferences.dismissed.length>0&&<details className="mt-4 text-sm text-text-secondary">
                         <summary className="min-h-11 cursor-pointer">Hidden titles ({preferences.dismissed.length})</summary>
-                        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">{preferences.dismissed.map(item=><li key={`${item.type}:${item.id}`} className="flex items-center justify-between gap-4"><span>{item.title} · {item.type==='tv'?'TV':'Movie'}</span><button type="button" disabled={loading} onClick={()=>restore(item.id,item.type)} className="min-h-11 shrink-0 text-accent-primary" aria-label={`Restore ${item.title}`}>Restore</button></li>)}</ul>
+                        <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto">{preferences.dismissed.map(item=><li key={`${item.type}:${item.id}`} className="flex items-center justify-between gap-4"><span>{item.title} · {item.type==='tv'?'TV':'Movie'} · {item.reason==='seen'?'Already watched':item.reason==='later'?`Snoozed until ${item.until?.slice(0,10)||'restored'}`:'Not my taste'}</span><button type="button" disabled={loading} onClick={()=>restore(item.id,item.type)} className="min-h-11 shrink-0 text-accent-primary" aria-label={`Restore ${item.title}`}>Restore</button></li>)}</ul>
                         <button type="button" disabled={loading} onClick={()=>setPreferences({dismissed:[]})} className="mt-2 min-h-11 text-accent-primary">Restore all titles</button>
                     </details>}
+                    <StreamingSettings/>
                     <FeedbackSettings/>
                 </div>
             </details>

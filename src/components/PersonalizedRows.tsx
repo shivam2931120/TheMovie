@@ -12,6 +12,7 @@ import { useProfilePreferences } from "@/context/ProfilePreferencesContext";
 import { RecommendationSettings } from './RecommendationSettings';
 import { personalizedMovies } from '@/lib/moviePersonalization';
 import { useRecommendationPreferences } from '@/context/RecommendationPreferencesContext';
+import Link from 'next/link';
 
 // GENRE_MAP for profile favourite-genre → TMDB genre ID
 const GENRE_ID_MAP: Record<string, number> = {
@@ -80,7 +81,7 @@ function PersonalizedRowsForAccount() {
     const { preferences: profilePreferences } = useProfilePreferences();
     const movieProfile=useRecommendationProfile();
     const profileJson = JSON.stringify(movieProfile);
-    const {isAllowed}=useRecommendationPreferences();
+    const {isAllowed,preferences,loading:preferencesLoading}=useRecommendationPreferences();
 
     useEffect(() => {
         const controller=new AbortController();
@@ -253,6 +254,7 @@ function PersonalizedRowsForAccount() {
       let count=0;
       return items.filter(item=>{
         const type=item.type||'movie';const key=`${type}:${item.id}`;
+        if(preferences.streaming.mode==='only'&&preferences.streaming.providers.length&&!item.streamingMatched)return false;
         if(count>=MAX_ROW_ITEMS||seen.has(key)||!isAllowed(item,watched)||(type==='tv'?tvProfile:movieProfile).exclude.includes(Number(item.id)))return false;
         seen.add(key);count++;return true;
       }).map(item=>reason?{...item,recommendationReason:reason,recommendationModel:item.recommendationModel||'tmdb-similar-v1'}:item);
@@ -265,6 +267,7 @@ function PersonalizedRowsForAccount() {
     return (
         <>
             <div className="container mx-auto px-6 lg:px-20"><RecommendationSettings /></div>
+            {!preferencesLoading&&!preferences.onboardingCompleted&&<div className="container mx-auto px-6 lg:px-20"><div className="rounded-xl border border-accent-primary/30 bg-white/5 p-5"><h2 className="font-bold text-white">Make these picks yours</h2><p className="mt-1 text-sm text-text-secondary">Rate 5–10 movies or shows to teach us your taste.</p><Link className="inline-flex min-h-11 items-center text-sm text-accent-primary" href="/taste">Set up your taste →</Link></div></div>}
             {!movieProfile.seeds.length&&!tvProfile.seeds.length&&<p className="container mx-auto px-6 pt-4 text-sm text-text-secondary lg:px-20">Start with popular picks. Rate a few titles or choose your favorite genres in your profile to make these more personal.</p>}
             {(loading||tvLoading)&&<p role="status" className="container mx-auto px-6 pt-4 text-sm text-text-muted lg:px-20">Updating your picks…</p>}
             {!loading&&!tvLoading&&!moviePicks.length&&!tvPicks.length&&<p className="container mx-auto px-6 py-6 text-sm text-text-muted lg:px-20">No picks are available right now. Try again later or adjust your hidden titles.</p>}

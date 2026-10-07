@@ -15,6 +15,7 @@ import { useRecommendationPreferences } from "@/context/RecommendationPreference
 
 import { usePathname } from "next/navigation";
 import { useFeedback } from "@/context/FeedbackContext";
+import type { FeedbackReason } from '@/lib/recommendationPreferences';
 
 interface Movie {
     id: number;
@@ -28,6 +29,7 @@ interface Movie {
     recommendationModel?: string;
     recommendationRequestId?: string;
     type?: "movie" | "tv";
+    streamingLabel?: string;
 }
 
 interface MovieCardProps {
@@ -49,7 +51,7 @@ export function MovieCard({ movie, className, priority = false, recommendation =
     const reducedMotion = useReducedMotion();
     const { openSignIn } = useClerk();
     const notify = useActionNotice();
-    const { dismiss, restore } = useRecommendationPreferences();
+    const { dismiss, restore, loading:preferencesLoading } = useRecommendationPreferences();
 
     const [isHovered, setIsHovered] = useState(false);
     const [swipeAction, setSwipeAction] = useState<'watchlist' | 'watched' | null>(null);
@@ -123,6 +125,12 @@ export function MovieCard({ movie, className, priority = false, recommendation =
         const previous = watched.find((item: any) => item.id === movie.id && (item.type || 'movie') === type) || { ...movie, type };
         if (isWatched) removeWatched(movie.id, type); else addWatched({ ...movie, type });
         notify(isWatched ? `${title} marked unwatched` : `${title} marked watched`, () => isWatched ? addWatched(previous) : removeWatched(movie.id, type));
+    };
+    const giveFeedback=(reason:FeedbackReason)=>{
+        dismiss({...movie,type},reason);
+        if(reason==='seen'&&!isWatched)addWatched({...movie,type});
+        const message=reason==='seen'?`${title} marked watched`:reason==='later'?`${title} snoozed for 7 days`:`${title} hidden: not your taste`;
+        notify(message,()=>{restore(movie.id,type);if(reason==='seen'&&!isWatched)removeWatched(movie.id,type);});
     };
     const handleDragEnd = (_event: any, info: PanInfo) => {
         const offset = info.offset.x;
@@ -268,7 +276,8 @@ export function MovieCard({ movie, className, priority = false, recommendation =
             </div>
             {recommendation && <div className="space-y-2 border-t border-white/10 bg-bg-card p-3 text-xs" onPointerDown={(event) => event.stopPropagation()}>
                 <details className="text-text-secondary"><summary className="cursor-pointer text-accent-primary">Why this title?</summary><p className="mt-2">{reason || "Similar to titles you enjoy"}</p></details>
-                <button type="button" onClick={(event) => { event.stopPropagation(); dismiss({ ...movie, type }); notify(`${title} hidden from recommendations`, () => restore(movie.id, type)); }} className="text-text-muted hover:text-white" aria-label={`Not interested in ${title}`}>Not interested</button>
+                {movie.streamingLabel&&<p className="text-green-300">On {movie.streamingLabel}</p>}
+                <details><summary className="min-h-11 cursor-pointer text-text-muted">Give feedback</summary><div className="space-y-1">{([['seen','Already watched'],['dislike','Not my taste'],['later','Not now · hide 7 days']] as const).map(([feedback,label])=><button key={feedback} type="button" disabled={preferencesLoading} onClick={event=>{event.stopPropagation();giveFeedback(feedback);}} className="min-h-11 w-full rounded-lg px-2 text-left text-text-secondary hover:bg-white/10 disabled:opacity-50" aria-label={`${label}: ${title}`}>{label}</button>)}</div></details>
             </div>}
         </motion.div>
     );

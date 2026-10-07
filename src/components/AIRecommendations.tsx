@@ -9,6 +9,7 @@ import { Sparkles } from "lucide-react";
 import { WatchedContext } from "@/context/WatchedContext";
 import { useRecommendationPreferences } from "@/context/RecommendationPreferencesContext";
 import { useRecommendationProfile } from "@/lib/useRecommendationProfile";
+import { applyStreamingPreferences } from '@/lib/streamingPersonalization';
 
 const hasCardData = (item: any) => item?.id && item?.poster_path && (item.title || item.name);
 
@@ -39,7 +40,7 @@ export function AIRecommendations({ id, type = "movie" }: { id: number; type?: "
                 setIsFallback(true);
                 const data = type === "tv" ? await getTVRecommendations(id) : await getMovieRecommendations(id);
                 const requestId=crypto.randomUUID();
-                items = (data?.results || []).filter(hasCardData).map((item: any) => ({ ...item, type, recommendationReason: "Similar titles suggested by TMDB",recommendationModel:'tmdb-similar-v1',recommendationRequestId:requestId }));
+                items = await applyStreamingPreferences((data?.results || []).filter(hasCardData).slice(0,20).map((item: any) => ({ ...item, type, recommendationReason: "Similar titles suggested by TMDB",recommendationModel:'tmdb-similar-v1',recommendationRequestId:requestId })),type,currentProfile.streaming,controller.signal);
             }
             if (active) setRecommendations(items.filter((item) => item.id !== id && !currentProfile.exclude.includes(item.id)));
         }

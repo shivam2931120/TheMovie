@@ -15,6 +15,7 @@ import { RecommendationPreferencesProvider } from "@/context/RecommendationPrefe
 import { ProfilePreferencesProvider } from "@/context/ProfilePreferencesContext";
 import { ActionNoticeProvider } from "./ActionNotice";
 import { FeedbackProvider } from "@/context/FeedbackContext";
+import { GoalsProvider } from '@/context/GoalsContext';
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
@@ -28,7 +29,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                             <ReviewProvider>
                                 <ListsProvider>
                                     <SocialProvider>
-                                        <ActionNoticeProvider>{children}</ActionNoticeProvider>
+                                        <GoalsProvider><ActionNoticeProvider>{children}</ActionNoticeProvider></GoalsProvider>
                                     </SocialProvider>
                                 </ListsProvider>
                             </ReviewProvider>

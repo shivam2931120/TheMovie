@@ -13,8 +13,16 @@ export function feedbackChanges(feature: string, before: any, after: any): Feedb
         }
         return events;
     }
-    const current = feature === 'recommendationPreferences' ? after?.dismissed : after;
-    const previous = feature === 'recommendationPreferences' ? before?.dismissed : before;
+    if(feature==='recommendationPreferences') {
+        // Only genuine dislikes train negative preferences. Legacy hides were dislikes.
+        const disliked=(data:any)=>new Map((Array.isArray(data?.dismissed)?data.dismissed:[]).filter((item:any)=>item&&valid(item.id)&&(!item.reason||item.reason==='dislike')).map((item:any)=>[`${typeOf(item)}:${item.id}`,item]));
+        const previous=disliked(before),current=disliked(after);
+        for(const [key,item] of current) if(!previous.has(key)) events.push({id:Number((item as any).id),type:typeOf(item),kind:'dismiss',value:1});
+        for(const [key,item] of previous) if(!current.has(key)) events.push({id:Number((item as any).id),type:typeOf(item),kind:'dismiss',value:0});
+        return events;
+    }
+    const current = after;
+    const previous = before;
     if (!Array.isArray(current)) return events;
     const old = new Map((Array.isArray(previous)?previous:[]).map((item:any)=>[feature==='watchDiary'?item.id:`${typeOf(item)}:${item.itemId||item.id}`,item]));
     if(feature==='ratings') {
@@ -22,12 +30,6 @@ export function feedbackChanges(feature: string, before: any, after: any): Feedb
         for(const item of Array.isArray(previous)?previous:[]) {
             const id=Number(item?.itemId||item?.id);
             if(item&&valid(id)&&!rated.has(`${typeOf(item)}:${id}`))events.push({id,type:typeOf(item),kind:'rating',value:0});
-        }
-    }
-    if(feature==='recommendationPreferences') {
-        const hidden=new Set(current.filter(Boolean).map((item:any)=>`${typeOf(item)}:${item.id}`));
-        for(const item of Array.isArray(previous)?previous:[]) {
-            if(item&&valid(item.id)&&!hidden.has(`${typeOf(item)}:${item.id}`))events.push({id:Number(item.id),type:typeOf(item),kind:'dismiss',value:0});
         }
     }
     for(const item of current) {
@@ -38,8 +40,8 @@ export function feedbackChanges(feature: string, before: any, after: any): Feedb
         const type=typeOf(media);
         const prior:any=old.get(feature==='watchDiary'?item.id:`${type}:${id}`);
         if(feature==='ratings' && Number(item.rating)>0 && item.rating!==prior?.rating) events.push({id,type,kind:'rating',value:Math.max(0,Math.min(10,Number(item.rating)))});
-        else if(feature==='watchDiary' && !prior) events.push({id,type,kind:(Array.isArray(before)&&before.some((entry:any)=>entry?.item?.id===id&&typeOf(entry.item)===type))?'rewatch':'watch'});
-        else if(!prior && ['watched','watchlist','recommendationPreferences'].includes(feature)) events.push({id,type,kind:feature==='watched'?'watch':feature==='watchlist'?'watchlist':'dismiss'});
+        else if(feature==='watchDiary' && !prior) events.push({id,type,kind:(item.rewatch??(Array.isArray(before)&&before.some((entry:any)=>entry?.item?.id===id&&typeOf(entry.item)===type)))?'rewatch':'watch'});
+        else if(!prior && ['watched','watchlist'].includes(feature)) events.push({id,type,kind:feature==='watched'?'watch':'watchlist'});
         if(feature==='watchDiary' && Number(item.rating)>0 && item.rating!==prior?.rating) events.push({id,type,kind:'rating',value:Number(item.rating)});
     }
     return events;

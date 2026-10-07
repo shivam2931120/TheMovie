@@ -4,6 +4,7 @@ import {rankRecommendations,type RecommendationProfile} from './recommendationRa
 import learned from '@/data/feedback-recommendations.json';
 import {blendGraphs,neighborValues,type NeighborGraph} from './recommendationGraph';
 import {catalogEntry} from './recommendationCatalog';
+import {applyStreamingPreferences,streamingDiscoverParams} from './streamingPersonalization';
 const GENRES:Record<number,string>={10759:'Action',16:'Animation',35:'Comedy',80:'Crime',99:'Documentary',18:'Drama',10751:'Family',10762:'Kids',9648:'Mystery',10763:'News',10764:'Reality',10765:'Sci-Fi',10766:'Soap',10767:'Talk',10768:'War'};
 const IDS=Object.fromEntries(Object.entries(GENRES).map(([id,name])=>[name,Number(id)]));
 /** Candidate retrieval from TMDB, then weighted taste/negative/MMR ranking. No MovieLens movie IDs. */
@@ -24,7 +25,7 @@ export async function personalizedTV(profile:RecommendationProfile,signal?:Abort
         for(const item of recs?.results||[])catalog.set(item.id,{...item,type:'tv'});
         liveGraph[String(seed.id)]=(recs?.results||[]).map((item:any)=>item.id);
     });
-    jobs.push((async()=>{const data=await getDiscoverTV({sort_by:'popularity.desc',...(genres.length?{with_genres:genres.join('|')}:{})});if(!signal?.aborted)for(const item of data?.results||[])catalog.set(item.id,{...item,type:'tv'});})());
+    jobs.push((async()=>{const data=await getDiscoverTV({sort_by:'popularity.desc',...(genres.length?{with_genres:genres.join('|')}:{}),...streamingDiscoverParams(profile.streaming)});if(!signal?.aborted)for(const item of data?.results||[])catalog.set(item.id,{...item,type:'tv'});})());
     await Promise.allSettled(jobs);
     if(signal?.aborted)return [];
     const graph=blendGraphs({graph:learned.tv as NeighborGraph,weight:1},{graph:liveGraph,weight:0.65});
@@ -36,5 +37,6 @@ export async function personalizedTV(profile:RecommendationProfile,signal?:Abort
     const eligibleGraph=Object.fromEntries(Object.entries(graph).map(([id,edges])=>[id,neighborValues(edges).filter(edge=>catalog.has(edge.id))]));
     const ranked=rankRecommendations({...profile,seeds,exclude:[...(profile.exclude||[]),...(currentId?[currentId]:[])]},eligibleGraph,entries,20);
     const requestId=crypto.randomUUID();
-    return ranked.map(result=>({...catalog.get(result.id),recommendationReason:result.reason,recommendationModel:"tv-profile-v2",recommendationRequestId:requestId})).filter(item=>item?.id&&item.poster_path);
+    const items=ranked.map(result=>({...catalog.get(result.id),recommendationReason:result.reason,recommendationModel:"tv-profile-v2",recommendationRequestId:requestId})).filter(item=>item?.id&&item.poster_path);
+    return applyStreamingPreferences(items,'tv',profile.streaming,signal);
 }
