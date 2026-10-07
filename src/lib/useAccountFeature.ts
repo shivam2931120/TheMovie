@@ -147,8 +147,10 @@ export function useAccountFeature<T>(feature:string,initial:T,mergeGuest:(accoun
         });
     },[feature,initial,normalize,owner]);
     const resolveConflict=useCallback(async(keepDevice:boolean)=>{
+        if(owner==='guest'||owner==='loading'||latestState.current.owner!==owner) return;
         const captured=latestState.current.snapshot.mutationId;
         const response=await fetch(`/api/account/${feature}`,{cache:'no-store',headers:{'X-TheMovie-Account':owner}});
+        if(userRef.current?.id!==owner||latestState.current.owner!==owner) return;
         if(!response.ok) {setStatus('Account sync unavailable'); return;}
         const remote=await response.json();
         setState(current=>{
@@ -159,6 +161,37 @@ export function useAccountFeature<T>(feature:string,initial:T,mergeGuest:(accoun
             return {...current,snapshot};
         });
     },[feature,normalize,owner]);
+    useEffect(()=>{
+        if(owner==='guest'||owner==='loading'||state.owner!==owner||!state.ready||!/account sync unavailable/i.test(status)) return;
+        let active=true;
+        let recovering=false;
+        let attempts=0;
+        let timer:ReturnType<typeof setTimeout>;
+        const schedule=()=>{
+            // Spread requests from different features and back off during an outage.
+            const delay=Math.min(15000*2**Math.min(attempts,3),120000)+Math.random()*3000;
+            timer=setTimeout(()=>void recover(),delay);
+        };
+        const recover=async()=>{
+            if(!active||recovering) return;
+            clearTimeout(timer);
+            if(navigator.onLine&&document.visibilityState==='visible'&&userRef.current?.id===owner) {
+                recovering=true;
+                attempts++;
+                try {
+                    if(latestState.current.snapshot.pending) setRetry(value=>value+1);
+                    else await resolveConflict(false);
+                } catch { if(active&&userRef.current?.id===owner) setStatus('Account sync unavailable'); }
+                finally { recovering=false; }
+            }
+            if(active) schedule();
+        };
+        const resume=()=>{if(document.visibilityState==='visible') void recover();};
+        schedule();
+        window.addEventListener('focus',resume);
+        document.addEventListener('visibilitychange',resume);
+        return ()=>{active=false;clearTimeout(timer);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume);};
+    },[owner,state.owner,state.ready,status,resolveConflict]);
     useEffect(()=>{
         if(state.owner!==owner) return;
         window.dispatchEvent(new CustomEvent('themovie-sync-status',{detail:{feature,owner,status}}));

@@ -43,6 +43,10 @@ successful database save. Pending device snapshots retain edits/deletions across
 reloads and are scoped by account. Cross-device stale revisions return 409.
 The sync notice lets the user use the account copy or deliberately replace it
 with their device copy. Saves retry on edits, reconnection, or the Retry action.
+Unavailable account sync also retries automatically in visible, online tabs,
+with increasing delays from roughly 15 seconds to two minutes and small random
+offsets to spread feature requests. Returning to the tab retries immediately.
+Automatic recovery preserves pending device edits and does not resolve conflicts.
 Failed database saves do not silently write back to bounded Clerk metadata.
 Public shared lists read current database state, so revocation takes effect when
 the database save succeeds. Publishing/revoking waits for sync before success.
